@@ -9,7 +9,7 @@
 | Total          | 104   |
 | Label Walking  | 12    |
 | Label Running  | 8     |
-| Label Kneeing  | 14    |
+| Label Kneeling | 14    |
 | Label Lying    | 10    |
 | Label Sitting  | 16    |
 | Label Standing | 8     |

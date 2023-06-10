@@ -3,7 +3,7 @@ label_map = dict()
 label_categories = [
     "Label Walking",
     "Label Running",
-    "Label Kneeing",
+    "Label Kneeling",
     "Label Lying",
     "Label Sitting",
     "Label Standing",
