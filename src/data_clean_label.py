@@ -64,6 +64,7 @@ def labeling(
 ) -> pd.DataFrame:
     # label_validation(df_time, labels)
     # labeling
+    df.reset_index(level=0, drop=True, inplace = True)
     for i in range(0, df_time.shape[0], 2):
         start_time = df_time["experiment time"][i]
         end_time = df_time["experiment time"][i + 1]
@@ -72,7 +73,7 @@ def labeling(
         ].index
         if "Label" not in df.columns:
             df["Label"] = np.nan
-        df.iloc[target_idx, pd.Index(df.columns).get_loc("Label")] = labels[i // 2]
+        df.loc[target_idx, "Label"] = labels[i // 2]
     # one hot encode
     df = one_hot_encoding(df, "Label", label_categories)
 
@@ -199,7 +200,10 @@ def fill_missing_value(df: pd.DataFrame) -> pd.DataFrame:
             column_data[head + 1 : tail][~mask] = column_data[tail]
     df[columns] = data
     df.drop_duplicates(subset=columns, inplace=True, ignore_index=True)
-    return df[df[timestamp_name] >= 0.0]
+    df = df[df[timestamp_name] >= 0.0]
+    df.reset_index(level=0, drop=True, inplace = True)
+    
+    return df
 
 
 def missing_value(df: pd.DataFrame) -> pd.DataFrame:
@@ -210,8 +214,7 @@ def missing_value(df: pd.DataFrame) -> pd.DataFrame:
 
     return df_result
 
-
-filepath = "../dataset/raw/"
+filepath = "/Users/thl/Downloads/"
 round_num = 3
 names = ["luca", "nicole", "sam"]
 df_cleaned = pd.DataFrame()
@@ -234,7 +237,7 @@ for round in range(1, round_num + 1):
             )
             df_result.drop(df_result[df_result["Error"] == 1].index, inplace=True)
             df_result.drop(columns="Error", inplace=True)
-            df_cleaned.reset_index(level=0, drop=True)
+            df_cleaned.reset_index(level=0, drop=True, inplace = True)
             # adjust time stamp
             df_result = adjust_granularity_timestamp_timediff(
                 df_result, "Time (s)", 10, df_map["time"]
