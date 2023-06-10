@@ -147,14 +147,14 @@ def adjust_granularity_timestamp_timediff(
             new_df.loc[[new_df.index[i]], sensor_columns] = np.average(
                 relevant_rows[sensor_columns], axis=0
             )
-            new_df.loc[[new_df.index[i]], other_columns] = np.array(
+            new_df.loc[[new_df.index[i]], other_columns] = np.asarray(
                 relevant_rows[other_columns].iloc[0]
             )
 
     new_df.insert(0, new_timestamp_name, new_df.index)
     new_df.dropna(inplace=True)
     new_df.reset_index(drop=True, inplace=True)
-    
+
     # Add Time difference
     new_df.insert(1, "Time difference (s)", new_df[new_timestamp_name])
     for i in range(0, time.shape[0], 2):
@@ -176,6 +176,32 @@ def adjust_granularity_timestamp_timediff(
     return new_df
 
 
+def fill_missing_value(df: pd.DataFrame) -> pd.DataFrame:
+    timestamp_name = "Time (s)"
+    columns = [col for col in df.columns if col != timestamp_name]
+    data = df[columns].values
+    timestamp = df[timestamp_name].values
+    nan_indices = np.isnan(data)
+    for i, _ in enumerate(columns):
+        column_data = data[:, i]
+        nan_index = nan_indices[:, i]
+        valid_indices = np.where(~nan_index)[0]
+        column_data[nan_index] = np.interp(
+            np.where(nan_index)[0], valid_indices, column_data[valid_indices]
+        )
+        for j in range(len(valid_indices) - 1):
+            head = valid_indices[j]
+            tail = valid_indices[j + 1]
+            time_diff_head = timestamp[head + 1 : tail] - timestamp[head]
+            time_diff_tail = timestamp[tail] - timestamp[head + 1 : tail]
+            mask = time_diff_head - time_diff_tail <= 0
+            column_data[head + 1 : tail][mask] = column_data[head]
+            column_data[head + 1 : tail][~mask] = column_data[tail]
+    df[columns] = data
+    df.drop_duplicates(subset=columns, inplace=True, ignore_index=True)
+    return df[df[timestamp_name] >= 0.0]
+
+
 def missing_value(df: pd.DataFrame) -> pd.DataFrame:
     #  propagate last valid observation forward to next valid.
     df.fillna(method="ffill", inplace=True)
@@ -185,7 +211,7 @@ def missing_value(df: pd.DataFrame) -> pd.DataFrame:
     return df_result
 
 
-filepath = "/Users/thl/Downloads/"
+filepath = "../dataset/raw/"
 round_num = 3
 names = ["luca", "nicole", "sam"]
 df_cleaned = pd.DataFrame()
@@ -198,7 +224,7 @@ for round in range(1, round_num + 1):
             df_map = load_dataset_map(filenames[0])
             df_result = concat_sensor_dataset(df_map)
             # missing value
-            df_result = missing_value(df_result)
+            df_result = fill_missing_value(df_result)
             # labeling
             df_result = labeling(
                 df_result,
