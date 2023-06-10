@@ -1,13 +1,16 @@
 # ML4QS_FallDetection
 
 ## Dataset Descripition
+
+### Total movement
+
 |                | count |
 | :------------- | :---- |
-| Total          | 81    |
-| Label Walking  | 7     |
+| Total          | 104   |
+| Label Walking  | 12    |
 | Label Running  | 8     |
-| Label Kneeing  | 10    |
-| Label Lying    | 11    |
-| Label Sitting  | 26    |
-| Label Standing | 3     |
-| Label Falling  | 16    |
+| Label Kneeling | 14    |
+| Label Lying    | 10    |
+| Label Sitting  | 16    |
+| Label Standing | 8     |
+| Label Falling  | 36    |

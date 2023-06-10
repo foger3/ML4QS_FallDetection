@@ -5,6 +5,7 @@ import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
 from labels import label_map, label_categories
 
+
 def load_dataset_map(
     filepath: str,
     sensor_names: list = [
@@ -38,7 +39,7 @@ def concat_sensor_dataset(
         "Gyroscope",
         "Barometer",
     ],
-):
+) -> pd.DataFrame:
     df_result = pd.DataFrame(columns=["Time (s)"])
     for sensor_name in sensor_names:
         df = df_map[str(sensor_name)]
@@ -47,7 +48,7 @@ def concat_sensor_dataset(
     return df_result
 
 
-def label_validation(df: pd.DataFrame, labels: list):
+def label_validation(df: pd.DataFrame, labels: list) -> None:
     dataset_row_num = df[df["event"] == "START"].shape[0]
     print("{} movements in this dataset.".format(dataset_row_num))
     print(
@@ -60,7 +61,7 @@ def label_validation(df: pd.DataFrame, labels: list):
 
 def labeling(
     df: pd.DataFrame, df_time: pd.DataFrame, labels: list, label_categories: list
-):
+) -> pd.DataFrame:
     # label_validation(df_time, labels)
     # labeling
     for i in range(0, df_time.shape[0], 2):
@@ -69,14 +70,16 @@ def labeling(
         target_idx = df[
             (df["Time (s)"] >= start_time) & (df["Time (s)"] <= end_time)
         ].index
-        df.loc[target_idx, ["Label"]] = labels[i // 2]
+        if "Label" not in df.columns:
+            df["Label"] = np.nan
+        df.iloc[target_idx, pd.Index(df.columns).get_loc("Label")] = labels[i // 2]
     # one hot encode
     df = one_hot_encoding(df, "Label", label_categories)
 
     return df
 
 
-def one_hot_encoding(df, column_name, label_categories: list):
+def one_hot_encoding(df, column_name, label_categories: list) -> pd.DataFrame:
     enc = OneHotEncoder(categories=[label_categories], sparse_output=False)
     arr_label = enc.fit_transform(df[column_name].to_numpy().reshape(-1, 1))
     df_label = pd.DataFrame(
@@ -92,6 +95,24 @@ def one_hot_encoding(df, column_name, label_categories: list):
 def adjust_granularity_timestamp_timediff(
     df: pd.DataFrame, timestamp_col: str, granularity: float, time: pd.DataFrame
 ) -> pd.DataFrame:
+    original_columns = df.columns
+    sensor_columns = [
+        "Magnetometer X (µT)",
+        "Magnetometer Y (µT)",
+        "Magnetometer Z (µT)",
+        "Accelerometer X (m/s^2)",
+        "Accelerometer Y (m/s^2)",
+        "Accelerometer Z (m/s^2)",
+        "Linear Accelerometer X (m/s^2)",
+        "Linear Accelerometer Y (m/s^2)",
+        "Linear Accelerometer Z (m/s^2)",
+        "Gyroscope X (rad/s)",
+        "Gyroscope Y (rad/s)",
+        "Gyroscope Z (rad/s)",
+        "Barometer X (hPa)",
+    ]
+    other_columns = list(set(df.columns) - set(sensor_columns))
+
     new_timestamp = np.empty((0,), dtype="datetime64")
     for i in range(0, len(time), 2):
         start_text = pd.Timestamp(time["system time text"][i][:19])
@@ -103,55 +124,59 @@ def adjust_granularity_timestamp_timediff(
         new_timestamp = np.concatenate(
             (new_timestamp, (start_text + pd.to_timedelta(period, unit="s")).values)
         )
-    df[timestamp_col] = new_timestamp
+
+    new_timestamp_name = "System time (s)"
+    df[new_timestamp_name] = new_timestamp
     timestamps = pd.date_range(
-        min(df[timestamp_col]),
-        max(df[timestamp_col]),
+        min(df[new_timestamp_name]),
+        max(df[new_timestamp_name]),
         freq=f"{granularity}ms",
     )
-    columns = [col for col in df.columns if col != timestamp_col]
-    new_df = pd.DataFrame(index=timestamps, columns=columns, dtype=object)
+    new_df = pd.DataFrame(index=timestamps, columns=original_columns, dtype=object)
     for i in range(len(new_df)):
         # Select the relevant measurements.
         relevant_rows = df[
-            (df[timestamp_col] >= new_df.index[i])
+            (df[new_timestamp_name] >= new_df.index[i])
             & (
-                df[timestamp_col]
+                df[new_timestamp_name]
                 < (new_df.index[i] + timedelta(milliseconds=granularity))
             )
         ]
-        for col in columns:
-            # Take the average value
-            if len(relevant_rows) > 0:
-                new_df.loc[new_df.index[i], col] = np.average(relevant_rows[col])
-            else:
-                new_df.loc[new_df.index[i], col] = np.nan
-    new_df.insert(0, timestamp_col, new_df.index)
-    new_df.insert(
-        1,
-        "Time difference (s)",
-        (new_df[timestamp_col] - new_df[timestamp_col].iloc[0]).dt.total_seconds(),
-    )
-    first_valid_row = new_df.index[0]
-    while 1:
-        first_null_row_index = None
-        for index, row in new_df.loc[first_valid_row:,].iterrows():
-            if row.isnull().any():
-                first_null_row_index = index
-                break
-        if first_null_row_index is None:
-            break
-        first_valid_row = new_df.loc[first_null_row_index:,].dropna().index[0]
-        new_df.loc[first_valid_row:, "Time difference (s)"] = (
-            new_df.loc[first_valid_row:, "Time difference (s)"]
-            - new_df.loc[first_valid_row, "Time difference (s)"]
-        )
+        # new add
+        if relevant_rows.shape[0] > 0:
+            new_df.loc[[new_df.index[i]], sensor_columns] = np.average(
+                relevant_rows[sensor_columns], axis=0
+            )
+            new_df.loc[[new_df.index[i]], other_columns] = np.array(
+                relevant_rows[other_columns].iloc[0]
+            )
+
+    new_df.insert(0, new_timestamp_name, new_df.index)
     new_df.dropna(inplace=True)
+    new_df.reset_index(drop=True, inplace=True)
+    
+    # Add Time difference
+    new_df.insert(1, "Time difference (s)", new_df[new_timestamp_name])
+    for i in range(0, time.shape[0], 2):
+        start_time = time["experiment time"][i]
+        end_time = time["experiment time"][i + 1]
+        target_idx = new_df[
+            (new_df["Time (s)"] >= start_time) & (new_df["Time (s)"] <= end_time)
+        ].index
+        if len(target_idx):
+            new_df.loc[target_idx, ["Time difference (s)"]] = (
+                new_df.loc[target_idx, "System time (s)"]
+                - new_df.loc[target_idx, "System time (s)"].iloc[0]
+            )
+    new_df["Time difference (s)"] = (
+        new_df["Time difference (s)"].astype("timedelta64[ms]").dt.total_seconds()
+    )
+    new_df.drop(columns="Time (s)", inplace=True)
     new_df.reset_index(drop=True, inplace=True)
     return new_df
 
 
-def missing_value(df: pd.DataFrame):
+def missing_value(df: pd.DataFrame) -> pd.DataFrame:
     #  propagate last valid observation forward to next valid.
     df.fillna(method="ffill", inplace=True)
     #  If any NA values are present, drop that row.
@@ -159,12 +184,12 @@ def missing_value(df: pd.DataFrame):
 
     return df_result
 
+
 filepath = "/Users/thl/Downloads/"
 round_num = 3
 names = ["luca", "nicole", "sam"]
 df_cleaned = pd.DataFrame()
 for round in range(1, round_num + 1):
-    df_result = pd.DataFrame()
     for name in names:
         # concatenate, fill missing value, and drop nan
         filenames = glob(rf"{filepath}*-round{round}-{name}")
@@ -175,12 +200,19 @@ for round in range(1, round_num + 1):
             # missing value
             df_result = missing_value(df_result)
             # labeling
-            df_result = labeling(df_result, df_map["time"], label_map[f"round{round}-{name}"], label_categories)
-            df_result.drop(df_result[df_result["Error"] == 1].index, inplace = True)
+            df_result = labeling(
+                df_result,
+                df_map["time"],
+                label_map[f"round{round}-{name}"],
+                label_categories,
+            )
+            df_result.drop(df_result[df_result["Error"] == 1].index, inplace=True)
             df_result.drop(columns="Error", inplace=True)
+            df_cleaned.reset_index(level=0, drop=True)
             # adjust time stamp
             df_result = adjust_granularity_timestamp_timediff(
                 df_result, "Time (s)", 10, df_map["time"]
             )
-    df_cleaned = pd.concat([df_cleaned, df_result], ignore_index=True)
+            df_cleaned = pd.concat([df_cleaned, df_result], ignore_index=True)
+
 df_cleaned.to_csv("../dataset/data_cleaned.csv", index=False)

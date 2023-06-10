@@ -1,6 +1,6 @@
 import pandas as pd
 
-def describe(df: pd.DataFrame):
+def describe(df: pd.DataFrame)->pd.DataFrame:
     movement_num = df[df["Time difference (s)"] == 0].shape[0]
     print(f"The number of movement: {movement_num}")
     movement_start_idx = df[df["Time difference (s)"] == 0].index
