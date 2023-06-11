@@ -24,6 +24,8 @@ class DistributionBasedOutlierDetection:
         self, df: pd.DataFrame, columns: list[str], C: int = 2
     ) -> pd.DataFrame:
         # Taken partly from: https://www.astro.rug.nl/software/kapteyn/
+
+        chauvenet_df = pd.DataFrame()
         for col in columns:
             # Computer the mean and standard deviation.
             mean = df[col].mean()
@@ -46,8 +48,8 @@ class DistributionBasedOutlierDetection:
                 prob.append(1.0 - 0.5 * (special.erf(high[i]) - special.erf(low[i])))
                 # And mark as an outlier when the probability is below our criterion.
                 mask.append(prob[i] < criterion)
-            df[f"{col}_outlier"] = mask
-        return df
+            chauvenet_df[f"{col}_outlier"] = mask
+        return chauvenet_df
 
     # Fits a mixture model towards the data expressed in col and adds a column with the probability
     # of observing the value given the mixture model.
@@ -55,6 +57,7 @@ class DistributionBasedOutlierDetection:
         self, df: pd.DataFrame, columns: list[str], n_components: int = 3
     ) -> pd.DataFrame:
         # Fit a mixture model to our data.
+        mixture_df = pd.DataFrame()
         for col in columns:
             data = df[df[col].notnull()][col]
             g = GaussianMixture(n_components=n_components, max_iter=100, n_init=1)
@@ -69,6 +72,19 @@ class DistributionBasedOutlierDetection:
                 np.power(10, probs), index=data.index, columns=[f"{col}_mixture"]
             )
 
-            df = pd.concat([df, data_probs], axis=1)
+            mixture_df = pd.concat([mixture_df, data_probs], axis=1)
 
-        return df
+        return mixture_df
+
+
+filepath = "/Users/lucat/OneDrive/Dokumente/GitHub/ML4QS_FallDetection/dataset/data_cleaned.csv"
+df = pd.read_csv(filepath)
+
+
+# Analysis of distribution-based outlier detection
+outlier_distribution = DistributionBasedOutlierDetection()
+
+chauvenet_df = outlier_distribution.chauvenet(df, df.columns[2:15])
+chauvenet_df.sum()
+
+mixture_df = outlier_distribution.mixture_model(df, df.columns[2:15])
