@@ -1,12 +1,3 @@
-##############################################################
-#                                                            #
-#    Mark Hoogendoorn and Burkhardt Funk (2017)              #
-#    Machine Learning for the Quantified Self                #
-#    Springer                                                #
-#    Chapter 3                                               #
-#                                                            #
-##############################################################
-
 from scipy import special
 from math import sqrt
 from sklearn.mixture import GaussianMixture
@@ -15,7 +6,6 @@ import pandas as pd
 
 # Class for outlier detection algorithms based on some distribution of the data. They
 # all consider only single points per row (i.e. one column).
-
 
 class DistributionBasedOutlierDetection:
     # Finds outliers in the specified column of datatable and adds a binary column with
@@ -75,16 +65,3 @@ class DistributionBasedOutlierDetection:
             mixture_df = pd.concat([mixture_df, data_probs], axis=1)
 
         return mixture_df
-
-
-filepath = "/Users/lucat/OneDrive/Dokumente/GitHub/ML4QS_FallDetection/dataset/data_cleaned.csv"
-df = pd.read_csv(filepath)
-
-
-# Analysis of distribution-based outlier detection
-outlier_distribution = DistributionBasedOutlierDetection()
-
-chauvenet_df = outlier_distribution.chauvenet(df, df.columns[2:15])
-chauvenet_df.sum()
-
-mixture_df = outlier_distribution.mixture_model(df, df.columns[2:15])
