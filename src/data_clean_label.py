@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
 from labels import label_map, label_categories
-
+from datetime import datetime
 
 def load_dataset_map(
     filepath: str,
@@ -94,88 +94,48 @@ def one_hot_encoding(df, column_name, label_categories: list) -> pd.DataFrame:
 
 
 def adjust_granularity_timestamp_timediff(
-    df: pd.DataFrame, timestamp_col: str, granularity: float, time: pd.DataFrame
+    df: pd.DataFrame, granularity: float, df_time: pd.DataFrame
 ) -> pd.DataFrame:
+    df.insert(1, "System time (s)", np.nan)
+    df.insert(2, "Time difference (s)", np.nan)
     original_columns = df.columns
-    sensor_columns = [
-        "Magnetometer X (µT)",
-        "Magnetometer Y (µT)",
-        "Magnetometer Z (µT)",
-        "Accelerometer X (m/s^2)",
-        "Accelerometer Y (m/s^2)",
-        "Accelerometer Z (m/s^2)",
-        "Linear Accelerometer X (m/s^2)",
-        "Linear Accelerometer Y (m/s^2)",
-        "Linear Accelerometer Z (m/s^2)",
-        "Gyroscope X (rad/s)",
-        "Gyroscope Y (rad/s)",
-        "Gyroscope Z (rad/s)",
-        "Barometer X (hPa)",
-    ]
-    other_columns = list(set(df.columns) - set(sensor_columns))
+    sensor_names = ["Magnetometer", "Accelerometer", "Linear Accelerometer", "Gyroscope", "Barometer"]
+    sensor_columns = df.columns[df.columns.str.startswith(tuple(sensor_names))].values
 
-    new_timestamp = np.empty((0,), dtype="datetime64")
-    for i in range(0, len(time), 2):
-        start_text = pd.Timestamp(time["system time text"][i][:19])
-        start = time["experiment time"][i]
-        end = time["experiment time"][i + 1]
-        period = df.loc[
-            (df[timestamp_col] >= start) & (df[timestamp_col] < end), timestamp_col
-        ]
-        new_timestamp = np.concatenate(
-            (new_timestamp, (start_text + pd.to_timedelta(period, unit="s")).values)
-        )
+    # dataframe to ndarray (for speedup)
+    arr = np.array(df, dtype=object)
+    arr_time_idx = df.columns.get_loc("Time (s)")
+    arr_systime_idx = df.columns.get_loc("System time (s)")
+    arr_sensor_idx = [df.columns.get_loc(col) for col in sensor_columns]
+    arr_label_idx = [df.columns.get_loc(col) for col in df.columns[df.columns.str.startswith('Label')]]
 
-    new_timestamp_name = "System time (s)"
-    df[new_timestamp_name] = new_timestamp
-    timestamps = pd.date_range(
-        min(df[new_timestamp_name]),
-        max(df[new_timestamp_name]),
-        freq=f"{granularity}ms",
-    )
-    new_df = pd.DataFrame(index=timestamps, columns=original_columns, dtype=object)
-    for i in range(len(new_df)):
-        # Select the relevant measurements.
-        relevant_rows = df[
-            (df[new_timestamp_name] >= new_df.index[i])
-            & (
-                df[new_timestamp_name]
-                < (new_df.index[i] + timedelta(milliseconds=granularity))
-            )
-        ]
-        # new add
-        if relevant_rows.shape[0] > 0:
-            new_df.loc[[new_df.index[i]], sensor_columns] = np.average(
-                relevant_rows[sensor_columns], axis=0
-            )
-            new_df.loc[[new_df.index[i]], other_columns] = np.asarray(
-                relevant_rows[other_columns].iloc[0]
-            )
+    arr_new = np.empty([0,2 + len(arr_sensor_idx) + len(arr_label_idx)], dtype=object)
+    for i in range(0, df_time.shape[0], 2):
+        start_systime = pd.Timestamp(df_time["system time text"][i][:23])
+        end_systime = pd.Timestamp(df_time["system time text"][i+1][:23])
+        start, end = df_time["experiment time"][i:i+2]
+        # add system time on target array
+        arr_trg = arr[((arr[:,arr_time_idx] >= start) & (arr[:,arr_time_idx] <= end)), :]
+        arr_trg[:, arr_systime_idx] = np.array(pd.to_timedelta(arr_trg[:,arr_time_idx] - start, unit="s")) + start_systime.to_datetime64()
+        # new timestamp base on granularity
+        timestamps = np.array(pd.date_range(start_systime, end_systime + pd.to_timedelta(granularity, unit="ms"), freq=f"{granularity}ms"))
+        start_new = 0
+        start_flag = False
+        for ts in timestamps:
+            relevant_rows = arr_trg[(arr_trg[:, arr_systime_idx].astype(datetime) >= ts) & (arr_trg[:, arr_systime_idx].astype(datetime) < (ts + np.timedelta64(granularity, 'ms'))),:]
+            if relevant_rows.shape[0] > 0:
+                start_flag = True
+                sensor_avg = np.average(relevant_rows[:,arr_sensor_idx], axis=0)
+                arr_tmp = np.concatenate((np.array([ts, start_new*granularity/1000.0]), sensor_avg, relevant_rows[:,arr_label_idx][0].astype("int")), dtype=object)
+                arr_new = np.concatenate((arr_new, np.expand_dims(arr_tmp, axis=0)))
+                # remove useless
+                arr_trg = arr_trg[relevant_rows.shape[0]:,:]
+            start_new += int(start_flag)
+    df = pd.DataFrame(arr_new, columns = original_columns[1:])
+    df["System time (s)"] = pd.to_datetime(df["System time (s)"])
+    df.reset_index(drop=True, inplace=True)
 
-    new_df.insert(0, new_timestamp_name, new_df.index)
-    new_df.dropna(inplace=True)
-    new_df.reset_index(drop=True, inplace=True)
-
-    # Add Time difference
-    new_df.insert(1, "Time difference (s)", new_df[new_timestamp_name])
-    for i in range(0, time.shape[0], 2):
-        start_time = time["experiment time"][i]
-        end_time = time["experiment time"][i + 1]
-        target_idx = new_df[
-            (new_df["Time (s)"] >= start_time) & (new_df["Time (s)"] <= end_time)
-        ].index
-        if len(target_idx):
-            new_df.loc[target_idx, ["Time difference (s)"]] = (
-                new_df.loc[target_idx, "System time (s)"]
-                - new_df.loc[target_idx, "System time (s)"].iloc[0]
-            )
-    new_df["Time difference (s)"] = (
-        new_df["Time difference (s)"].astype("timedelta64[ms]").dt.total_seconds()
-    )
-    new_df.drop(columns="Time (s)", inplace=True)
-    new_df.reset_index(drop=True, inplace=True)
-    return new_df
-
+    return df
 
 def fill_missing_value(df: pd.DataFrame) -> pd.DataFrame:
     timestamp_name = "Time (s)"
@@ -205,18 +165,10 @@ def fill_missing_value(df: pd.DataFrame) -> pd.DataFrame:
     
     return df
 
-
-def missing_value(df: pd.DataFrame) -> pd.DataFrame:
-    #  propagate last valid observation forward to next valid.
-    df.fillna(method="ffill", inplace=True)
-    #  If any NA values are present, drop that row.
-    df.dropna(how="any", inplace=True, ignore_index=True)
-
-    return df_result
-
 filepath = "/Users/thl/Downloads/"
 round_num = 3
 names = ["luca", "nicole", "sam"]
+granularity = 10
 df_cleaned = pd.DataFrame()
 for round in range(1, round_num + 1):
     for name in names:
@@ -237,11 +189,11 @@ for round in range(1, round_num + 1):
             )
             df_result.drop(df_result[df_result["Error"] == 1].index, inplace=True)
             df_result.drop(columns="Error", inplace=True)
-            df_cleaned.reset_index(level=0, drop=True, inplace = True)
             # adjust time stamp
             df_result = adjust_granularity_timestamp_timediff(
-                df_result, "Time (s)", 10, df_map["time"]
+                df_result, granularity, df_map["time"]
             )
+            df_cleaned.reset_index(level=0, drop=True, inplace = True)
             df_cleaned = pd.concat([df_cleaned, df_result], ignore_index=True)
 
-df_cleaned.to_csv("../dataset/data_cleaned.csv", index=False)
+df_cleaned.to_csv(f"../dataset/data_cleaned_{granularity}.csv", index=False)
