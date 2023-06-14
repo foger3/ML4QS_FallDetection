@@ -54,6 +54,7 @@ class DistributionBasedOutlierDetection:
         n_components: int = 3
     ) -> pd.DataFrame:
         # Fit a mixture model to our data.
+        
         mixture_df = pd.DataFrame()
         for col in columns:
             data = df[df[col].notnull()][col]
