@@ -1,5 +1,5 @@
-from scipy.signal import butter, lfilter, filtfilt
 import pandas as pd
+from scipy.signal import butter, lfilter, filtfilt
 
 
 def low_pass_filter(
@@ -20,10 +20,6 @@ def low_pass_filter(
             df[col + "_lowpass"] = filtfilt(b, a, df[col])
         else:
             df[col + "_lowpass"] = lfilter(b, a, df[col])
+            
     return df
 
-
-df = pd.read_csv("../dataset/data_cleaned.csv")
-granularity = 10
-columns = ["Magnetometer X (µT)"]
-df = low_pass_filter(df, columns, 1000 / granularity, 1.5)

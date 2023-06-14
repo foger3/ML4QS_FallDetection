@@ -1,10 +1,10 @@
-from datetime import timedelta
 from glob import glob
+
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
 from labels import label_map, label_categories
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def load_dataset_map(
     filepath: str,
@@ -27,6 +27,7 @@ def load_dataset_map(
     for meta_name in meta_names:
         filename = f"{filepath}/meta/{meta_name}.csv"
         df_map[meta_name] = pd.read_csv(filename)
+    
     return df_map
 
 
@@ -45,6 +46,7 @@ def concat_sensor_dataset(
         df = df_map[str(sensor_name)]
         df_result = pd.merge(df_result, df, on="Time (s)", how="outer")
     df_result.sort_values(by=["Time (s)"], ignore_index=True, inplace=True)
+    
     return df_result
 
 
@@ -60,7 +62,10 @@ def label_validation(df: pd.DataFrame, labels: list) -> None:
 
 
 def labeling(
-    df: pd.DataFrame, df_time: pd.DataFrame, labels: list, label_categories: list
+    df: pd.DataFrame, 
+    df_time: pd.DataFrame, 
+    labels: list, 
+    label_categories: list
 ) -> pd.DataFrame:
     # label_validation(df_time, labels)
     # labeling
@@ -80,7 +85,11 @@ def labeling(
     return df
 
 
-def one_hot_encoding(df, column_name, label_categories: list) -> pd.DataFrame:
+def one_hot_encoding(
+    df: pd.DataFrame, 
+    column_name, 
+    label_categories: list
+) -> pd.DataFrame:
     enc = OneHotEncoder(categories=[label_categories], sparse_output=False)
     arr_label = enc.fit_transform(df[column_name].to_numpy().reshape(-1, 1))
     df_label = pd.DataFrame(
@@ -94,7 +103,9 @@ def one_hot_encoding(df, column_name, label_categories: list) -> pd.DataFrame:
 
 
 def adjust_granularity_timestamp_timediff(
-    df: pd.DataFrame, granularity: float, df_time: pd.DataFrame
+    df: pd.DataFrame, 
+    granularity: float, 
+    df_time: pd.DataFrame
 ) -> pd.DataFrame:
     df.insert(1, "System time (s)", np.nan)
     df.insert(2, "Time difference (s)", np.nan)
@@ -137,7 +148,9 @@ def adjust_granularity_timestamp_timediff(
 
     return df
 
-def fill_missing_value(df: pd.DataFrame) -> pd.DataFrame:
+def fill_missing_value(
+    df: pd.DataFrame
+) -> pd.DataFrame:
     timestamp_name = "Time (s)"
     columns = [col for col in df.columns if col != timestamp_name]
     data = df[columns].values
@@ -164,6 +177,7 @@ def fill_missing_value(df: pd.DataFrame) -> pd.DataFrame:
     df.reset_index(level=0, drop=True, inplace = True)
     
     return df
+
 
 filepath = "/Users/thl/Downloads/"
 round_num = 3
