@@ -29,6 +29,7 @@ _ = describe(df)
 ## Outlier Analysis
 outlier = OutlierDetectionDistribution(df, sensor_columns)
 chauvenet_df = outlier.chauvenet(C=2)
+# outlier.visualize_chauvenet_outlier(chauvenet_df)
 mixture_df = outlier.mixture_model(n_components=3)
 
 ## Missing & General Data Transformation
@@ -40,7 +41,7 @@ df = transform.low_pass_filter(sampling_frequency=(1000 / granularity),
                                cutoff_frequency=1.5,
                                order=10,
                                phase_shift=True)
-
+# transform.visualize_low_pass()
 
 ### Feature Engineering ###
 # Initialize the window sizes to the number of instances representing 5 seconds
