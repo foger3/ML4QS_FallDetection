@@ -12,9 +12,9 @@ from non_temporal_modelling import ClassificationProcedure, ClassificationEvalua
 ### Read in cleaned data and defined reoccruing objects ###
 df = pd.read_csv("../dataset/data_cleaned.csv")
 sensor_columns = [
-    col for col in df.columns[2:15] if "Linear" not in col
+    col for col in df.columns[3:16] if "Linear" not in col
 ]  # [col for col in df.columns[2:15]]
-label_columns = [col for col in df.columns[15:]]
+label_columns = [col for col in df.columns[16:]]
 milliseconds_per_instance = (
     df.loc[1, "Time difference (s)"] * 1000
 )  # Compute number of milliseconds covered by an instance
@@ -24,7 +24,7 @@ milliseconds_per_instance = (
 _ = describe(df)
 
 # Reduce df to relevant data (cut out time and linear acceleration - essentially same as accelerometer)
-df = df[sensor_columns + label_columns]
+df = df[["ID"] + sensor_columns + label_columns]
 # [col for col in df.columns]
 
 
