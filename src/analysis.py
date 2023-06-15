@@ -5,7 +5,7 @@ from descriptives import describe
 from outlier_detection import OutlierDetectionDistribution
 from data_transformation import DataTransformation
 from feature_engineering import FeatureAbstraction
-from non_temporal_modelling import ClassificationProcedure
+from non_temporal_modelling import ClassificationProcedure, ClassificationEvaluation
 
 
 ## ANALYSIS SECTION: Combining function from other modules ##
@@ -82,9 +82,7 @@ selected_features = ['Accelerometer Y (m/s^2)_temp_min_ws_500',
 
 ### Non-temporal Predictive Modelling ###
 class_pro = ClassificationProcedure(final_df, label_columns, selected_features)
-
-print('Training set length is: ', len(class_pro.train_X.index))
-print('Test set length is: ', len(class_pro.test_X.index))
+class_eval = ClassificationEvaluation()
 
 performance_tr_nn, performance_te_nn = 0, 0
 performance_tr_rf, performance_te_rf = 0, 0
@@ -92,27 +90,27 @@ performance_tr_svm, performance_te_svm = 0, 0
 
 cv_rep = 5
 for repeat in range(cv_rep):
-    # print("Training NeuralNetwork run {} / {} ... ".format(repeat, cv_rep))
-    # class_train_y, class_test_y, class_train_prob_y, class_test_prob_y = class_pro.feedforward_neural_network(gridsearch=True)
+    print("Training NeuralNetwork run {} / {} ... ".format(repeat, cv_rep))
+    class_train_y, class_test_y, class_train_prob_y, class_test_prob_y = class_pro.feedforward_neural_network(gridsearch=True)
     
-    # performance_tr_nn += class_pro.accuracy(class_pro.train_y, class_train_y)
-    # performance_te_nn += class_pro.accuracy(class_pro.test_y, class_test_y)
+    performance_tr_nn += class_eval.accuracy(class_pro.train_y, class_train_y)
+    performance_te_nn += class_eval.accuracy(class_pro.test_y, class_test_y)
     
     print("Training RandomForest run {} / {} ... ".format(repeat, cv_rep))
     class_train_y, class_test_y, class_train_prob_y, class_test_prob_y = class_pro.random_forest(gridsearch=True)
     
-    performance_tr_rf += class_pro.accuracy(class_pro.train_y, class_train_y)
-    performance_te_rf += class_pro.accuracy(class_pro.test_y, class_test_y)
+    performance_tr_rf += class_eval.accuracy(class_pro.train_y, class_train_y)
+    performance_te_rf += class_eval.accuracy(class_pro.test_y, class_test_y)
 
-    # print("Training SVM run {} / {} ... ".format(repeat, cv_rep))
-    # class_train_y, class_test_y, class_train_prob_y, class_test_prob_y = class_pro.support_vector_machine(gridsearch=True)
+    print("Training SVM run {} / {} ... ".format(repeat, cv_rep))
+    class_train_y, class_test_y, class_train_prob_y, class_test_prob_y = class_pro.support_vector_machine(gridsearch=True)
     
-    # performance_tr_svm += class_pro.accuracy(class_pro.train_y, class_train_y)
-    # performance_te_svm += class_pro.accuracy(class_pro.test_y, class_test_y)
+    performance_tr_svm += class_eval.accuracy(class_pro.train_y, class_train_y)
+    performance_te_svm += class_eval.accuracy(class_pro.test_y, class_test_y)
 
-# overall_performance_tr_nn = performance_tr_nn/cv_rep
-# overall_performance_te_nn = performance_te_nn/cv_rep
+overall_performance_tr_nn = performance_tr_nn/cv_rep
+overall_performance_te_nn = performance_te_nn/cv_rep
 overall_performance_tr_rf = performance_tr_rf/cv_rep
 overall_performance_te_rf = performance_te_rf/cv_rep
-# overall_performance_tr_svm = performance_tr_svm/cv_rep
-# overall_performance_te_svm = performance_te_svm/cv_rep
+overall_performance_tr_svm = performance_tr_svm/cv_rep
+overall_performance_te_svm = performance_te_svm/cv_rep

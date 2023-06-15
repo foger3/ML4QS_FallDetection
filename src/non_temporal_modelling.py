@@ -78,6 +78,10 @@ class ClassificationPrepareData:
         else:
             training_set_X, test_set_X, training_set_y, test_set_y = train_test_split(df.iloc[:,features],
                                                                                       df.iloc[:,class_label_indices], test_size=(1-training_frac), stratify=df.iloc[:,class_label_indices], random_state=random_state)
+        
+        print('Training set length is: ', len(training_set_X.index))
+        print('Test set length is: ', len(test_set_X.index))
+        
         return training_set_X, test_set_X, training_set_y, test_set_y
 
 # Class for evaluation metrics of classification problems.
@@ -108,7 +112,7 @@ class ClassificationEvaluation:
         return metrics.confusion_matrix(y_true, y_pred, labels=labels)
 
 # Class features the most popular and best-performing classification algorithms.
-class ClassificationProcedure(ClassificationEvaluation):
+class ClassificationProcedure:
 
     def __init__(
         self,
@@ -265,7 +269,7 @@ class ClassificationProcedure(ClassificationEvaluation):
                 _, pred_y_test, _, _ = self.decision_tree(train_X[temp_selected_features],
                                                           train_y,
                                                           test_X[temp_selected_features])
-                perf = self.accuracy(test_y, pred_y_test)
+                perf = ClassificationEvaluation.accuracy(test_y, pred_y_test)
 
                 # If the performance is better than what we have seen so far (we aim for high accuracy)
                 # we set the current feature to the best feature and the same for the best performance.
