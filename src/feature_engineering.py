@@ -139,12 +139,11 @@ class FourierTransformation:
             # Therefore values are not returned but stored in temp class variable 'temp_list'.
 
             # note to self! Rolling window_size would be nicer and more logical! In older version windowsize is actually 41. (ws + 1)
-            df[col].rolling(
-                window_size + 1).apply(self.find_fft_transformation)
+            df[col].rolling(window_size + 1).apply(self.find_fft_transformation)
 
             # Pad the missing rows with nans
             frequencies = np.pad(np.array(self.temp_list), ((window_size, 0), (0, 0)),
-                        'constant', constant_values=np.nan)
+                                 'constant', constant_values=np.nan)
             # add new freq columns to frame
             
             df[collist] = pd.DataFrame(frequencies, index=df.index)
