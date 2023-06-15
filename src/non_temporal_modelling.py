@@ -125,7 +125,16 @@ class ClassificationProcedure:
         self.train_X, self.test_X, self.train_y, self.test_y = prepare.split_classification(df, class_labels)
         self.select = selected if selected is not None else self.train_X.columns
 
-    def feedforward_neural_network(self, hidden_layer_sizes=(100,), max_iter=500, activation='logistic', alpha=0.0001, learning_rate='adaptive', gridsearch=True, print_model_details=False):
+    def feedforward_neural_network(
+        self, 
+        hidden_layer_sizes: int = (100,), 
+        max_iter: int = 500, 
+        activation: str = 'logistic', 
+        alpha: float = 0.0001, 
+        learning_rate: str = 'adaptive', 
+        gridsearch: bool = True, 
+        print_model_details: bool = False
+    ) -> pd.DataFrame:
         train_X, test_X, train_y = self.train_X[self.select], self.test_X[self.select], self.train_y
 
         if gridsearch:
@@ -156,7 +165,14 @@ class ClassificationProcedure:
 
         return pred_training_y, pred_test_y, frame_prob_training_y, frame_prob_test_y
 
-    def support_vector_machine(self, C=1,  kernel='rbf', gamma=1e-3, gridsearch=True, print_model_details=False):
+    def support_vector_machine(
+        self, 
+        C: int = 1,  
+        kernel: str = 'rbf', 
+        gamma: float = 1e-3, 
+        gridsearch: bool = True, 
+        print_model_details: bool = False
+    ) -> pd.DataFrame:
         train_X, test_X, train_y = self.train_X[self.select], self.test_X[self.select], self.train_y
 
         if gridsearch:
@@ -230,7 +246,13 @@ class ClassificationProcedure:
         return pred_training_y, pred_test_y, frame_prob_training_y, frame_prob_test_y
     
     @staticmethod
-    def decision_tree(train_X, train_y, test_X, min_samples_leaf=50, criterion='gini'):
+    def decision_tree(
+        train_X: pd.DataFrame, 
+        train_y: pd.DataFrame, 
+        test_X: pd.DataFrame, 
+        min_samples_leaf: int = 50, 
+        criterion: str = 'gini'
+    ) -> pd.DataFrame:
         dtree = DecisionTreeClassifier(min_samples_leaf=min_samples_leaf, criterion=criterion)
         dtree.fit(train_X, train_y.values.ravel())
 
