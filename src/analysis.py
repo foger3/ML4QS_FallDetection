@@ -2,23 +2,20 @@ import copy
 import pandas as pd
 
 from descriptives import describe
-from outlier_detection import DistributionBasedOutlierDetection
-from missing_data import impute_interpolate
-from data_transformation import low_pass_filter
-from feature_engineering import TemporalAbstraction, FourierTransformation
+from outlier_detection import OutlierDetectionDistribution
+from data_transformation import DataTransformation
+from feature_engineering import FeatureAbstraction
 from non_temporal_modelling import ClassificationPrepareData, ClassificationFeatureSelection, ClassificationEvaluation, ClassificationAlgorithms
 
 
 ## ANALYSIS SECTION: Combining function from other modules ##
-### Read in cleaned data ###
+### Read in cleaned data and defined reoccruing objects ###
 df = pd.read_csv("../dataset/data_cleaned.csv")
-sensor_columns = [col for col in df.columns[2:5]] # [col for col in df.columns[2:15]]
+sensor_columns = [col for col in df.columns[2:15] if "Linear" not in col] # [col for col in df.columns[2:15]]
 label_columns = [col for col in df.columns[15:]] 
+milliseconds_per_instance = df.loc[1, "Time difference (s)"] * 1000 # Compute number of milliseconds covered by an instance
 
 # Initialize classes
-outlier_distribution = DistributionBasedOutlierDetection()
-temporal_features = TemporalAbstraction()
-frequency_features = FourierTransformation()
 prepare = ClassificationPrepareData()
 feature_select = ClassificationFeatureSelection()
 eval = ClassificationEvaluation()
@@ -30,43 +27,37 @@ _ = describe(df)
 
 ### Noise Handling ###
 ## Outlier Analysis
-chauvenet_df = outlier_distribution.chauvenet(df, sensor_columns)
-chauvenet_df.sum()
-mixture_df = outlier_distribution.mixture_model(df, sensor_columns)
+outlier = OutlierDetectionDistribution(df, sensor_columns)
+chauvenet_df = outlier.chauvenet(C=2)
+mixture_df = outlier.mixture_model(n_components=3)
 
-## Missing Data Imputation
-df = impute_interpolate(df, sensor_columns)
+## Missing & General Data Transformation
+transform = DataTransformation(df, sensor_columns)
+# df = transform.impute_interpolate()
 
-## Data Transformation
 granularity = 10
-filter_df = low_pass_filter(df, sensor_columns, 1000 / granularity, 1.5)
+df = transform.low_pass_filter(sampling_frequency=(1000 / granularity), 
+                               cutoff_frequency=1.5,
+                               order=10,
+                               phase_shift=True)
 
 
 ### Feature Engineering ###
-# Compute number of milliseconds covered by an instance
-milliseconds_per_instance = df.loc[1, "Time difference (s)"] * 1000
+# Initialize the window sizes to the number of instances representing 5 seconds
+features = FeatureAbstraction(window_size=int(float(5000)/milliseconds_per_instance),
+                              sampling_rate=float(1000)/milliseconds_per_instance) # important for frequency domain
 
 ## Temporal Domain
-# Set the window sizes to the number of instances representing 5 seconds and 30 seconds
-window_sizes = [int(float(5000)/milliseconds_per_instance)]#, int(float(30000)/milliseconds_per_instance)]
-num_features = ["mean", "std", "median", "min", "max", "sem"]#, "slope"] # slope takes very long
+for feature in ["mean", "std", "median", "min", "max", "sem"]: #, "slope"] # slope takes very long
+    df = features.abstract_numerical(df, sensor_columns, feature)
 
-for ws in window_sizes:
-    for feature in num_features:
-        filter_df = temporal_features.abstract_numerical(filter_df, sensor_columns, ws, feature)
-        
 ## Frequency Domain
-fs = float(1000)/milliseconds_per_instance
-ws = int(float(5000)/milliseconds_per_instance)
-filter_df = frequency_features.abstract_frequency(copy.deepcopy(filter_df), sensor_columns, ws, fs)
+df = features.abstract_frequency(copy.deepcopy(df), sensor_columns)
 
-# Merge final_df with label columns from original dataframe (df)
-final_df = pd.merge(filter_df, df[label_columns], left_index=True, right_index=True)
-
-# The percentage of overlap we allow
+# The percentage of overlap we allow: 95%
 window_overlap = 0.95
-skip_points = int((1-window_overlap) * window_sizes[0])
-final_df = final_df.iloc[::skip_points,:].reset_index(drop=True)
+skip_points = int((1-window_overlap) * int(float(5000)/milliseconds_per_instance))
+final_df = df.iloc[::skip_points,:].reset_index(drop=True)
 
 
 ### Non-temporal Predictive Modelling ###
@@ -77,7 +68,7 @@ print('Training set length is: ', len(train_X.index))
 print('Test set length is: ', len(test_X.index))
 
 # Feature Selection
-max_features = 10
+max_features = 15
 selected_features, ordered_features, ordered_scores = feature_select.forward_selection(max_features,
                                                                                        train_X,
                                                                                        test_X,
@@ -85,16 +76,21 @@ selected_features, ordered_features, ordered_scores = feature_select.forward_sel
                                                                                        test_y,
                                                                                        gridsearch=False)
 
-# selected_features = ['Magnetometer Z (µT)_temp_max_ws_500', 
-#                      'Magnetometer Y (µT)_freq_0.0_Hz_ws_500', 
+# selected_features = ['Accelerometer Y (m/s^2)_temp_min_ws_500', 
+#                      'Accelerometer X (m/s^2)_temp_min_ws_500', 
+#                      'Accelerometer Y (m/s^2)_freq_0.0_Hz_ws_500', 
+#                      'Accelerometer Z (m/s^2)_temp_max_ws_500', 
+#                      'Magnetometer Z (µT)_temp_median_ws_500', 
+#                      'Accelerometer Z (m/s^2)_temp_min_ws_500', 
+#                      'Accelerometer X (m/s^2)', 
+#                      'Accelerometer Z (m/s^2)_temp_median_ws_500', 
 #                      'Magnetometer Z (µT)_temp_min_ws_500', 
-#                      'Magnetometer Z (µT)_freq_0.8_Hz_ws_500', 
-#                      'Magnetometer X (µT)_temp_min_ws_500', 
-#                      'Magnetometer Y (µT)_temp_min_ws_500', 
-#                      'Magnetometer Z (µT)_freq_0.0_Hz_ws_500', 
-#                      'Magnetometer Z (µT)_freq_1.4_Hz_ws_500', 
-#                      'Magnetometer Z (µT)_freq_0.6_Hz_ws_500', 
-#                      'Magnetometer X (µT)_temp_median_ws_500']
+#                      'Accelerometer X (m/s^2)_temp_mean_ws_500', 
+#                      'Magnetometer X (µT)_freq_48.6_Hz_ws_500', 
+#                      'Accelerometer Y (m/s^2)_freq_2.6_Hz_ws_500', 
+#                      'Gyroscope X (rad/s)_freq_5.8_Hz_ws_500', 
+#                      'Accelerometer X (m/s^2)_freq_3.4_Hz_ws_500', 
+#                      'Accelerometer X (m/s^2)_freq_24.4_Hz_ws_500']
 
 selected_train_X = train_X[selected_features]
 selected_test_X = test_X[selected_features]
@@ -112,23 +108,23 @@ for repeat in range(cv_rep):
     # performance_tr_nn += eval.accuracy(train_y, class_train_y)
     # performance_te_nn += eval.accuracy(test_y, class_test_y)
     
-    # print("Training RandomForest run {} / {} ... ".format(repeat, cv_rep))
-    # class_train_y, class_test_y, class_train_prob_y, class_test_prob_y = learner.random_forest(
-    #     selected_train_X, train_y, selected_test_X, gridsearch=True
-    # )
-    # performance_tr_rf += eval.accuracy(train_y, class_train_y)
-    # performance_te_rf += eval.accuracy(test_y, class_test_y)
-
-    print("Training SVM run {} / {} ... ".format(repeat, cv_rep))
-    class_train_y, class_test_y, class_train_prob_y, class_test_prob_y = learner.support_vector_machine_with_kernel(
+    print("Training RandomForest run {} / {} ... ".format(repeat, cv_rep))
+    class_train_y, class_test_y, class_train_prob_y, class_test_prob_y = learner.random_forest(
         selected_train_X, train_y, selected_test_X, gridsearch=True
     )
-    performance_tr_svm += eval.accuracy(train_y, class_train_y)
-    performance_te_svm += eval.accuracy(test_y, class_test_y)
+    performance_tr_rf += eval.accuracy(train_y, class_train_y)
+    performance_te_rf += eval.accuracy(test_y, class_test_y)
+
+    # print("Training SVM run {} / {} ... ".format(repeat, cv_rep))
+    # class_train_y, class_test_y, class_train_prob_y, class_test_prob_y = learner.support_vector_machine_with_kernel(
+    #     selected_train_X, train_y, selected_test_X, gridsearch=True
+    # )
+    # performance_tr_svm += eval.accuracy(train_y, class_train_y)
+    # performance_te_svm += eval.accuracy(test_y, class_test_y)
 
 # overall_performance_tr_nn = performance_tr_nn/cv_rep
 # overall_performance_te_nn = performance_te_nn/cv_rep
-# overall_performance_tr_rf = performance_tr_rf/cv_rep
-# overall_performance_te_rf = performance_te_rf/cv_rep
-overall_performance_tr_svm = performance_tr_svm/cv_rep
-overall_performance_te_svm = performance_te_svm/cv_rep
+overall_performance_tr_rf = performance_tr_rf/cv_rep
+overall_performance_te_rf = performance_te_rf/cv_rep
+# overall_performance_tr_svm = performance_tr_svm/cv_rep
+# overall_performance_te_svm = performance_te_svm/cv_rep

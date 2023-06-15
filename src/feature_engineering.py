@@ -3,13 +3,23 @@ import pandas as pd
 import scipy.stats as stats
 
 
-# Class to abstract a history of numerical values we can use as an attribute.
-class TemporalAbstraction:
+class FeatureAbstraction:
 
-    # For the slope we need a bit more work.
-    # We create time points, assuming discrete time steps with fixed delta t:
-    def get_slope(
+    def __init__(
         self, 
+        window_size: int, 
+        sampling_rate: float
+    ):
+
+        self.ws = window_size
+        self.fs = sampling_rate
+
+        self.temp_list = []
+        self.freqs = None
+
+    # We create time points, assuming discrete time steps with fixed delta t:
+    @staticmethod
+    def get_slope(
         data: pd.Series
     ):
         
@@ -34,10 +44,9 @@ class TemporalAbstraction:
     def aggregate_value(
         self, 
         data: pd.Series, 
-        window_size: int, 
         aggregation_function: str
     ):
-        # window = str(window_size) + 's'
+        window_size = self.ws
         # Compute the values and return the result.
         if aggregation_function == 'mean':
             return data.rolling(window_size, min_periods=window_size).mean()
@@ -60,27 +69,17 @@ class TemporalAbstraction:
         self, 
         df: pd.DataFrame, 
         columns: list[str], 
-        window_size: int, 
         aggregation_function_name: str
     ) -> pd.DataFrame:
     
         for col in columns: 
-            aggregations = self.aggregate_value(df[col], window_size, aggregation_function_name)
-            df[col + '_temp_' + aggregation_function_name + '_ws_' + str(window_size)] = aggregations
+            aggregations = self.aggregate_value(df[col], aggregation_function_name)
+            df[col + '_temp_' + aggregation_function_name + '_ws_' + str(self.ws)] = aggregations
       
         return df
 
-
-# This class performs a Fourier transformation to find frequencies that occur often and filter noise.
-class FourierTransformation:
-    
-    def __init__(self):
-        self.temp_list = []
-        self.freqs = None
-
     # Find the amplitudes of the different frequencies using a fast fourier transformation. 
     # Here, the sampling rate expresses the number of samples per second (i.e. Frequency is Hertz of the dataset).
-    
     def find_fft_transformation(
         self, 
         data: pd.Series
@@ -118,11 +117,9 @@ class FourierTransformation:
     def abstract_frequency(
         self, 
         df: pd.DataFrame, 
-        columns: list[str], 
-        window_size: int, 
-        sampling_rate: int
+        columns: list[str]
     ):
-        self.freqs = (sampling_rate * np.fft.rfftfreq(int(window_size))).round(3)
+        self.freqs = (self.fs * np.fft.rfftfreq(int(self.ws))).round(3)
 
         for col in columns:
             collist = []
@@ -132,17 +129,17 @@ class FourierTransformation:
             collist.append(col + '_pse')
             
             collist = collist + [col + '_freq_' +
-                    str(freq) + '_Hz_ws_' + str(window_size) for freq in self.freqs]
+                    str(freq) + '_Hz_ws_' + str(self.ws) for freq in self.freqs]
            
             # rolling statistics to calculate frequencies, per window size. 
             # Pandas Rolling method can only return one aggregation value. 
             # Therefore values are not returned but stored in temp class variable 'temp_list'.
 
             # note to self! Rolling window_size would be nicer and more logical! In older version windowsize is actually 41. (ws + 1)
-            df[col].rolling(window_size + 1).apply(self.find_fft_transformation)
+            df[col].rolling(self.ws + 1).apply(self.find_fft_transformation)
 
             # Pad the missing rows with nans
-            frequencies = np.pad(np.array(self.temp_list), ((window_size, 0), (0, 0)),
+            frequencies = np.pad(np.array(self.temp_list), ((self.ws, 0), (0, 0)),
                                  'constant', constant_values=np.nan)
             # add new freq columns to frame
             
