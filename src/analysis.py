@@ -11,9 +11,13 @@ from non_temporal_modelling import ClassificationProcedure, ClassificationEvalua
 ## ANALYSIS SECTION: Combining function from other modules ##
 ### Read in cleaned data and defined reoccruing objects ###
 df = pd.read_csv("../dataset/data_cleaned.csv")
-sensor_columns = [col for col in df.columns[2:15] if "Linear" not in col] # [col for col in df.columns[2:15]]
-label_columns = [col for col in df.columns[15:]] 
-milliseconds_per_instance = df.loc[1, "Time difference (s)"] * 1000 # Compute number of milliseconds covered by an instance
+sensor_columns = [
+    col for col in df.columns[2:15] if "Linear" not in col
+]  # [col for col in df.columns[2:15]]
+label_columns = [col for col in df.columns[15:]]
+milliseconds_per_instance = (
+    df.loc[1, "Time difference (s)"] * 1000
+)  # Compute number of milliseconds covered by an instance
 
 
 ### Descriptive Analysis ###
@@ -36,19 +40,27 @@ transform = DataTransformation()
 # df = transform.impute_interpolate(df, sensor_columns)
 
 granularity = 10
-df = transform.low_pass_filter(sampling_frequency=(1000 / granularity), 
-                               cutoff_frequency=1.5,
-                               order=10,
-                               phase_shift=True)
-# transform.visualize_low_pass()
+df = transform.low_pass_filter(
+    df, sensor_columns, sampling_frequency=(1000 / granularity), cutoff_frequency=1.5
+)
+
 
 ### Feature Engineering ###
 # Initialize the window sizes to the number of instances representing 5 seconds
-features = FeatureAbstraction(window_size=int(float(5000)/milliseconds_per_instance),
-                              sampling_rate=float(1000)/milliseconds_per_instance) # important for frequency domain
+features = FeatureAbstraction(
+    window_size=int(float(5000) / milliseconds_per_instance),
+    sampling_rate=float(1000) / milliseconds_per_instance,
+)  # important for frequency domain
 
 ## Temporal Domain
-for feature in ["mean", "std", "median", "min", "max", "sem"]: #, "slope"] # slope takes very long
+for feature in [
+    "mean",
+    "std",
+    "median",
+    "min",
+    "max",
+    "sem",
+]:  # , "slope"] # slope takes very long
     df = features.abstract_numerical(df, sensor_columns, feature)
 
 ## Frequency Domain
@@ -56,29 +68,34 @@ df = features.abstract_frequency(copy.deepcopy(df), sensor_columns)
 
 ## Overlap: The percentage of overlap we allow: 95%
 window_overlap = 0.95
-skip_points = int((1-window_overlap) * int(float(5000)/milliseconds_per_instance))
-final_df = df.iloc[::skip_points,:].reset_index(drop=True)
+skip_points = int((1 - window_overlap) * int(float(5000) / milliseconds_per_instance))
+final_df = df.iloc[::skip_points, :].reset_index(drop=True)
+
+## PCA
+final_df = features.abstract_features_with_pca(final_df, label_columns)
 
 
 ### Feature Selection ###
 class_fall = ClassificationProcedure(final_df, label_columns)
 selected_features, _, _ = class_fall.forward_selection(max_features=2)
 
-selected_features = ['Accelerometer Y (m/s^2)_temp_min_ws_500', 
-                     'Accelerometer X (m/s^2)_temp_min_ws_500', 
-                     'Accelerometer Y (m/s^2)_freq_0.0_Hz_ws_500', 
-                     'Accelerometer Z (m/s^2)_temp_max_ws_500', 
-                     'Magnetometer Z (µT)_temp_median_ws_500', 
-                     'Accelerometer Z (m/s^2)_temp_min_ws_500', 
-                     'Accelerometer X (m/s^2)', 
-                     'Accelerometer Z (m/s^2)_temp_median_ws_500', 
-                     'Magnetometer Z (µT)_temp_min_ws_500', 
-                     'Accelerometer X (m/s^2)_temp_mean_ws_500', 
-                     'Magnetometer X (µT)_freq_48.6_Hz_ws_500', 
-                     'Accelerometer Y (m/s^2)_freq_2.6_Hz_ws_500', 
-                     'Gyroscope X (rad/s)_freq_5.8_Hz_ws_500', 
-                     'Accelerometer X (m/s^2)_freq_3.4_Hz_ws_500', 
-                     'Accelerometer X (m/s^2)_freq_24.4_Hz_ws_500']
+selected_features = [
+    "Accelerometer Y (m/s^2)_temp_min_ws_500",
+    "Accelerometer X (m/s^2)_temp_min_ws_500",
+    "Accelerometer Y (m/s^2)_freq_0.0_Hz_ws_500",
+    "Accelerometer Z (m/s^2)_temp_max_ws_500",
+    "Magnetometer Z (µT)_temp_median_ws_500",
+    "Accelerometer Z (m/s^2)_temp_min_ws_500",
+    "Accelerometer X (m/s^2)",
+    "Accelerometer Z (m/s^2)_temp_median_ws_500",
+    "Magnetometer Z (µT)_temp_min_ws_500",
+    "Accelerometer X (m/s^2)_temp_mean_ws_500",
+    "Magnetometer X (µT)_freq_48.6_Hz_ws_500",
+    "Accelerometer Y (m/s^2)_freq_2.6_Hz_ws_500",
+    "Gyroscope X (rad/s)_freq_5.8_Hz_ws_500",
+    "Accelerometer X (m/s^2)_freq_3.4_Hz_ws_500",
+    "Accelerometer X (m/s^2)_freq_24.4_Hz_ws_500",
+]
 
 
 ### Non-temporal Predictive Modelling ###
@@ -92,26 +109,41 @@ performance_tr_svm, performance_te_svm = 0, 0
 cv_rep = 5
 for repeat in range(cv_rep):
     print("Training NeuralNetwork run {} / {} ... ".format(repeat, cv_rep))
-    class_train_y, class_test_y, class_train_prob_y, class_test_prob_y = class_pro.feedforward_neural_network(gridsearch=True)
-    
+    (
+        class_train_y,
+        class_test_y,
+        class_train_prob_y,
+        class_test_prob_y,
+    ) = class_pro.feedforward_neural_network(gridsearch=True)
+
     performance_tr_nn += class_eval.accuracy(class_pro.train_y, class_train_y)
     performance_te_nn += class_eval.accuracy(class_pro.test_y, class_test_y)
-    
+
     print("Training RandomForest run {} / {} ... ".format(repeat, cv_rep))
-    class_train_y, class_test_y, class_train_prob_y, class_test_prob_y = class_pro.random_forest(gridsearch=True)
-    
+    (
+        class_train_y,
+        class_test_y,
+        class_train_prob_y,
+        class_test_prob_y,
+    ) = class_pro.random_forest(gridsearch=True)
+
     performance_tr_rf += class_eval.accuracy(class_pro.train_y, class_train_y)
     performance_te_rf += class_eval.accuracy(class_pro.test_y, class_test_y)
 
     print("Training SVM run {} / {} ... ".format(repeat, cv_rep))
-    class_train_y, class_test_y, class_train_prob_y, class_test_prob_y = class_pro.support_vector_machine(gridsearch=True)
-    
+    (
+        class_train_y,
+        class_test_y,
+        class_train_prob_y,
+        class_test_prob_y,
+    ) = class_pro.support_vector_machine(gridsearch=True)
+
     performance_tr_svm += class_eval.accuracy(class_pro.train_y, class_train_y)
     performance_te_svm += class_eval.accuracy(class_pro.test_y, class_test_y)
 
-overall_performance_tr_nn = performance_tr_nn/cv_rep
-overall_performance_te_nn = performance_te_nn/cv_rep
-overall_performance_tr_rf = performance_tr_rf/cv_rep
-overall_performance_te_rf = performance_te_rf/cv_rep
-overall_performance_tr_svm = performance_tr_svm/cv_rep
-overall_performance_te_svm = performance_te_svm/cv_rep
+overall_performance_tr_nn = performance_tr_nn / cv_rep
+overall_performance_te_nn = performance_te_nn / cv_rep
+overall_performance_tr_rf = performance_tr_rf / cv_rep
+overall_performance_te_rf = performance_te_rf / cv_rep
+overall_performance_tr_svm = performance_tr_svm / cv_rep
+overall_performance_te_svm = performance_te_svm / cv_rep
