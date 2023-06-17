@@ -18,7 +18,7 @@ label_columns = [col for col in df.columns[16:]]
 milliseconds_per_instance = (
     df.loc[1, "Time difference (s)"] * 1000
 )  # Compute number of milliseconds covered by an instance
-binary = True # Binarize Classification(?)
+matching = "binary" # Binarize Classification(?)
 
 ### Descriptive Analysis ###
 _ = describe(df)
@@ -76,8 +76,8 @@ final_df = features.abstract_features_with_pca(final_df, label_columns, n_compon
 
 
 ### Feature Selection ###
-class_fall = ClassificationProcedure(final_df, label_columns, binary)
-selected_features, _, _ = class_fall.forward_selection(max_features=2)
+class_feature = ClassificationProcedure(final_df, label_columns, matching)
+selected_features, _, _ = class_feature.forward_selection(max_features=10)
 
 selected_features = [
     "Accelerometer Y (m/s^2)_temp_min_ws_500",
@@ -99,7 +99,7 @@ selected_features = [
 
 
 ### Non-temporal Predictive Modelling ###
-class_pro = ClassificationProcedure(final_df, label_columns, binary, selected_features)
+class_pro = ClassificationProcedure(final_df, label_columns, matching, selected_features)
 class_eval = ClassificationEvaluation()
 
 performance_tr_nn, performance_te_nn = 0, 0

@@ -19,7 +19,6 @@ class ClassificationPrepareData:
         self, 
         df: pd.DataFrame, 
         class_labels: list[str],
-        binary: bool = True
     ) -> pd.DataFrame:
         
         # Find which columns are relevant based on the possibly partial class_label specification.
@@ -36,23 +35,30 @@ class ClassificationPrepareData:
             if sum_values[i] == 1:
                 df.iloc[i, df.columns.get_loc(self.class_col)] = df[labels].iloc[i].idxmax(axis=0)
         
-        if binary:
-            class_binary = class_labels[-1]
-            df[self.class_col] = df[self.class_col].apply(
-                lambda x: class_binary if x == class_binary \
-                    else (str("Non ") + class_binary)
-            )
-        
         # And remove our old binary columns.
         df = df.drop(labels, axis=1)
 
+        return df
+    
+    @staticmethod
+    def binarize( 
+        df: pd.DataFrame, 
+        class_labels: list[str]
+    ) -> pd.DataFrame:
+            
+        # Binarize the class labels.
+        df = df.drop(class_labels[:-1], axis=1)
+        df[class_labels[-1]] = df[class_labels[-1]].apply(
+            lambda x: class_labels[-1] if x == 1 \
+                else (str("Non ") + class_labels[-1])
+        )
+        
         return df
 
     def split_classification(
         self, 
         df: pd.DataFrame, 
         class_labels: list[str], 
-        binary: bool = True,
         matching: str = "like", 
         training_frac: float = 0.7, 
         filter: bool = True, 
@@ -62,15 +68,18 @@ class ClassificationPrepareData:
 
         # Create a single class column if we have the 'like' option.
         if matching == 'like':
-            df = self.assign_label(df, class_labels, binary)
+            df = self.assign_label(df, class_labels)
             class_labels = self.class_col
+        elif matching == 'binary':
+            df = self.binarize(df, class_labels)
+            class_labels = class_labels[-1]
         elif len(class_labels) == 1:
             class_labels = class_labels[0]
 
         # Filter NaN is desired and those for which we cannot determine the class should be removed.
         if filter:
             df = df.dropna()
-            df = df[df['class'] != self.default_label]
+            df = df[df[class_labels] != self.default_label]
 
         # The features are the ones not in the class label.
         features = [df.columns.get_loc(x) for x in df.columns if x not in class_labels]
@@ -103,6 +112,9 @@ class ClassificationPrepareData:
                 df[df["ID"].isin(testing_id)].iloc[:, features],
                 df[df["ID"].isin(testing_id)].iloc[:, class_label_indices],
             )
+
+            for df_i in [training_set_X, test_set_X]:
+                df_i = df_i.drop(["ID"], axis=1, inplace=True)
 
         print('Training set length is: ', len(training_set_X.index))
         print('Test set length is: ', len(test_set_X.index))
@@ -143,7 +155,7 @@ class ClassificationProcedure:
         self,
         df: pd.DataFrame,
         class_labels: list[str],
-        binary: bool = True,
+        matching: str = "like",
         selected: list[str] = None,
     ):
         prepare = ClassificationPrepareData()
@@ -152,7 +164,7 @@ class ClassificationProcedure:
             self.test_X, 
             self.train_y, 
             self.test_y
-        ) = prepare.split_classification(df, class_labels, binary)
+        ) = prepare.split_classification(df, class_labels, matching)
         self.select = selected if selected is not None \
             else self.train_X.columns
 
@@ -215,8 +227,9 @@ class ClassificationProcedure:
         ) = self.train_X[self.select], self.test_X[self.select], self.train_y
 
         if gridsearch:
-            tuned_parameters = [{'kernel': ['rbf'], 'gamma': [1e-3, 1e-4],
-                         'C': [1, 10, 100]}]
+            tuned_parameters = [{'kernel': ['linear', 'sigmoid', 'poly', 'rbf'], 
+                                 'gamma': [1e-3, 1e-4],
+                                 'C': [1, 10, 100]}]
             svm = GridSearchCV(SVC(probability=True), tuned_parameters, cv=5, scoring='accuracy')
         else:
             svm = SVC(C=C, kernel=kernel, gamma=gamma, probability=True, cache_size=7000)
