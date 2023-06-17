@@ -8,7 +8,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import GridSearchCV, train_test_split
 
-
 # This class creates dfs splits that can be used by classification learning algorithms.
 class ClassificationPrepareData:
 
@@ -76,9 +75,25 @@ class ClassificationPrepareData:
             test_set_y = df.iloc[end_training_set:len(df.index), class_label_indices]
         # For non temporal data we use a standard function to randomly split the df.
         else:
-            training_set_X, test_set_X, training_set_y, test_set_y = train_test_split(df.iloc[:,features],
-                                                                                      df.iloc[:,class_label_indices], test_size=(1-training_frac), stratify=df.iloc[:,class_label_indices], random_state=random_state)
-        
+            df_head = df.drop_duplicates("ID", ignore_index=True)
+            training_set_X, test_set_X, training_set_y, test_set_y = train_test_split(
+                            df_head.iloc[:, features],
+                            df_head.iloc[:, class_label_indices],
+                            test_size=(1-training_frac),
+                            stratify=df_head.iloc[:, class_label_indices],
+                            random_state=random_state,
+                        )
+            training_id = training_set_X["ID"].values
+            testing_id = test_set_X["ID"].values
+            training_set_X, training_set_y = (
+                df[df["ID"].isin(training_id)].iloc[:, features],
+                df[df["ID"].isin(training_id)].iloc[:, class_label_indices],
+            )
+            test_set_X, test_set_y = (
+                df[df["ID"].isin(testing_id)].iloc[:, features],
+                df[df["ID"].isin(testing_id)].iloc[:, class_label_indices],
+            )
+
         print('Training set length is: ', len(training_set_X.index))
         print('Test set length is: ', len(test_set_X.index))
         
