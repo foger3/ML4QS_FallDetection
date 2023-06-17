@@ -18,7 +18,8 @@ class ClassificationPrepareData:
     def assign_label(
         self, 
         df: pd.DataFrame, 
-        class_labels: list[str]
+        class_labels: list[str],
+        binary: bool = True
     ) -> pd.DataFrame:
         
         # Find which columns are relevant based on the possibly partial class_label specification.
@@ -29,11 +30,19 @@ class ClassificationPrepareData:
         # Determine how many class values are label as 'true' in our class columns.
         sum_values = df[labels].sum(axis=1)
         # Create a new 'class' column and set the value to the default class.
-        df['class'] = self.default_label
+        df[self.class_col] = self.default_label
         for i in range(0, len(df.index)):
             # If we have exactly one true class column, we can assign that value, otherwise we keep the default class.
             if sum_values[i] == 1:
                 df.iloc[i, df.columns.get_loc(self.class_col)] = df[labels].iloc[i].idxmax(axis=0)
+        
+        if binary:
+            class_binary = class_labels[-1]
+            df[self.class_col] = df[self.class_col].apply(
+                lambda x: class_binary if x == class_binary \
+                    else (str("Non ") + class_binary)
+            )
+        
         # And remove our old binary columns.
         df = df.drop(labels, axis=1)
 
@@ -43,6 +52,7 @@ class ClassificationPrepareData:
         self, 
         df: pd.DataFrame, 
         class_labels: list[str], 
+        binary: bool = True,
         matching: str = "like", 
         training_frac: float = 0.7, 
         filter: bool = True, 
@@ -52,7 +62,7 @@ class ClassificationPrepareData:
 
         # Create a single class column if we have the 'like' option.
         if matching == 'like':
-            df = self.assign_label(df, class_labels)
+            df = self.assign_label(df, class_labels, binary)
             class_labels = self.class_col
         elif len(class_labels) == 1:
             class_labels = class_labels[0]
@@ -133,12 +143,18 @@ class ClassificationProcedure:
         self,
         df: pd.DataFrame,
         class_labels: list[str],
+        binary: bool = True,
         selected: list[str] = None,
     ):
         prepare = ClassificationPrepareData()
-
-        self.train_X, self.test_X, self.train_y, self.test_y = prepare.split_classification(df, class_labels)
-        self.select = selected if selected is not None else self.train_X.columns
+        (
+            self.train_X, 
+            self.test_X, 
+            self.train_y, 
+            self.test_y
+        ) = prepare.split_classification(df, class_labels, binary)
+        self.select = selected if selected is not None \
+            else self.train_X.columns
 
     def feedforward_neural_network(
         self, 
@@ -150,7 +166,11 @@ class ClassificationProcedure:
         gridsearch: bool = True, 
         print_model_details: bool = False
     ) -> pd.DataFrame:
-        train_X, test_X, train_y = self.train_X[self.select], self.test_X[self.select], self.train_y
+        (
+            train_X, 
+            test_X, 
+            train_y 
+        ) = self.train_X[self.select], self.test_X[self.select], self.train_y
 
         if gridsearch:
             # With the current parameters for max_iter and Python 3 packages convergence is not always reached, therefore increased +1000.
@@ -188,7 +208,11 @@ class ClassificationProcedure:
         gridsearch: bool = True, 
         print_model_details: bool = False
     ) -> pd.DataFrame:
-        train_X, test_X, train_y = self.train_X[self.select], self.test_X[self.select], self.train_y
+        (
+            train_X, 
+            test_X, 
+            train_y 
+        ) = self.train_X[self.select], self.test_X[self.select], self.train_y
 
         if gridsearch:
             tuned_parameters = [{'kernel': ['rbf'], 'gamma': [1e-3, 1e-4],
@@ -224,7 +248,11 @@ class ClassificationProcedure:
         print_model_details: bool = False, 
         gridsearch: bool = True
     ) -> pd.DataFrame:
-        train_X, test_X, train_y = self.train_X[self.select], self.test_X[self.select], self.train_y
+        (
+            train_X, 
+            test_X, 
+            train_y 
+        ) = self.train_X[self.select], self.test_X[self.select], self.train_y
 
         if gridsearch:
             tuned_parameters = [{'min_samples_leaf': [2, 10, 50, 100, 200],
@@ -285,7 +313,12 @@ class ClassificationProcedure:
         self,
         max_features: int = 10
     ) -> list:
-        train_X, test_X, train_y, test_y = self.train_X[self.select], self.test_X[self.select], self.train_y, self.test_y
+        (
+            train_X, 
+            test_X, 
+            train_y, 
+            test_y 
+        ) = self.train_X[self.select], self.test_X[self.select], self.train_y, self.test_y
 
         # Start with no features.
         ordered_features, ordered_scores, selected_features  = [[] for _ in range(3)]

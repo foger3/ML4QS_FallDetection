@@ -18,7 +18,7 @@ label_columns = [col for col in df.columns[16:]]
 milliseconds_per_instance = (
     df.loc[1, "Time difference (s)"] * 1000
 )  # Compute number of milliseconds covered by an instance
-
+binary = True # Binarize Classification(?)
 
 ### Descriptive Analysis ###
 _ = describe(df)
@@ -76,7 +76,7 @@ final_df = features.abstract_features_with_pca(final_df, label_columns)
 
 
 ### Feature Selection ###
-class_fall = ClassificationProcedure(final_df, label_columns)
+class_fall = ClassificationProcedure(final_df, label_columns, binary)
 selected_features, _, _ = class_fall.forward_selection(max_features=2)
 
 selected_features = [
@@ -99,16 +99,16 @@ selected_features = [
 
 
 ### Non-temporal Predictive Modelling ###
-class_pro = ClassificationProcedure(final_df, label_columns, selected_features)
+class_pro = ClassificationProcedure(final_df, label_columns, binary, selected_features)
 class_eval = ClassificationEvaluation()
 
 performance_tr_nn, performance_te_nn = 0, 0
 performance_tr_rf, performance_te_rf = 0, 0
 performance_tr_svm, performance_te_svm = 0, 0
 
-cv_rep = 5
-for repeat in range(cv_rep):
-    print("Training NeuralNetwork run {} / {} ... ".format(repeat, cv_rep))
+n_cv_rep = 1
+for repeat in range(n_cv_rep):
+    print("Training NeuralNetwork run {} / {} ... ".format(repeat, n_cv_rep))
     (
         class_train_y,
         class_test_y,
@@ -119,7 +119,7 @@ for repeat in range(cv_rep):
     performance_tr_nn += class_eval.accuracy(class_pro.train_y, class_train_y)
     performance_te_nn += class_eval.accuracy(class_pro.test_y, class_test_y)
 
-    print("Training RandomForest run {} / {} ... ".format(repeat, cv_rep))
+    print("Training RandomForest run {} / {} ... ".format(repeat, n_cv_rep))
     (
         class_train_y,
         class_test_y,
@@ -130,7 +130,7 @@ for repeat in range(cv_rep):
     performance_tr_rf += class_eval.accuracy(class_pro.train_y, class_train_y)
     performance_te_rf += class_eval.accuracy(class_pro.test_y, class_test_y)
 
-    print("Training SVM run {} / {} ... ".format(repeat, cv_rep))
+    print("Training SVM run {} / {} ... ".format(repeat, n_cv_rep))
     (
         class_train_y,
         class_test_y,
@@ -141,9 +141,11 @@ for repeat in range(cv_rep):
     performance_tr_svm += class_eval.accuracy(class_pro.train_y, class_train_y)
     performance_te_svm += class_eval.accuracy(class_pro.test_y, class_test_y)
 
-overall_performance_tr_nn = performance_tr_nn / cv_rep
-overall_performance_te_nn = performance_te_nn / cv_rep
-overall_performance_tr_rf = performance_tr_rf / cv_rep
-overall_performance_te_rf = performance_te_rf / cv_rep
-overall_performance_tr_svm = performance_tr_svm / cv_rep
-overall_performance_te_svm = performance_te_svm / cv_rep
+overall_performance_tr_nn = performance_tr_nn / n_cv_rep
+overall_performance_te_nn = performance_te_nn / n_cv_rep
+overall_performance_tr_rf = performance_tr_rf / n_cv_rep
+overall_performance_te_rf = performance_te_rf / n_cv_rep
+overall_performance_tr_svm = performance_tr_svm / n_cv_rep
+overall_performance_te_svm = performance_te_svm / n_cv_rep
+
+class_eval.confusion_matrix(class_pro.test_y, class_test_y, class_train_prob_y.columns)
