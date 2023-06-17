@@ -36,18 +36,16 @@ df = df[["ID"] + sensor_columns + label_columns]
 ## Outlier Analysis
 outlier = OutlierDetectionDistribution(df, sensor_columns)
 chauvenet_df = outlier.chauvenet(C=2)
-# outlier.visualize_chauvenet_outlier(chauvenet_df)
+# outlier.chauvenet_visualize(chauvenet_df)
 mixture_df = outlier.mixture_model(n_components=3)
 
 ## Missing & General Data Transformation
-transform = DataTransformation()
+transform = DataTransformation(df, sensor_columns)
 # df = transform.impute_interpolate(df, sensor_columns)
 
 granularity = 10
-df = transform.low_pass_filter(
-    df, sensor_columns, sampling_frequency=(1000 / granularity), cutoff_frequency=1.5
-)
-
+df = transform.low_pass_filter(sampling_frequency=(1000 / granularity), cutoff_frequency=1.5)
+# transform.low_pass_filter_visualize(df, label_columns)
 
 ### Feature Engineering ###
 # Initialize the window sizes to the number of instances representing 5 seconds
@@ -144,4 +142,5 @@ for repeat in range(n_cv_rep):
     performance_tr_svm += class_eval.accuracy(class_pro.train_y, class_train_y)
     performance_te_svm += class_eval.accuracy(class_pro.test_y, class_test_y)
 
-class_eval.confusion_matrix(class_pro.test_y, class_test_y, class_train_prob_y.columns)
+cm = class_eval.confusion_matrix(class_pro.test_y, class_test_y, class_train_prob_y.columns)
+class_eval.confusion_matrix_visualize(cm, [col.split(" ")[1] for col in class_train_prob_y.columns], "./cm_rf.png")

@@ -2,26 +2,24 @@ import pandas as pd
 import plotly.graph_objects as go
 from scipy.signal import butter, lfilter, filtfilt
 from plotly.subplots import make_subplots
-from typing import List
 
 
 class DataTransformation:
+    def __init__(self, df: pd.DataFrame, columns: list[str]):
+        self.df = df.copy()
+        self.columns = columns
 
     # Interpolate the dataset based on previous/next values..
-    @staticmethod
-    def impute_interpolate(
-        df: pd.DataFrame, 
-        columns: list[str]
-    ) -> pd.DataFrame:
-        
-        df[columns] = df[columns].interpolate().ffill().bfill()
+    # @staticmethod
+    def impute_interpolate(self) -> pd.DataFrame:
+        df = self.df.copy()
+        df[self.columns] = df[self.columns].interpolate().ffill().bfill()
 
         return df
     
-    @staticmethod
+    # @staticmethod
     def low_pass_filter(
-        df: pd.DataFrame, 
-        columns: list[str],
+        self,
         sampling_frequency: float,
         cutoff_frequency: float = 1.5,
         order: int = 10,
@@ -29,9 +27,9 @@ class DataTransformation:
     ) -> pd.DataFrame:
         # http://stackoverflow.com/questions/12093594/how-to-implement-band-pass-butterworth-filter-with-scipy-signal-butter
         # Cutoff frequencies are expressed as the fraction of the Nyquist frequency, which is half the sampling frequency
-
+        df = self.df.copy()
         nyq = 0.5 * sampling_frequency
-        for col in columns:
+        for col in self.columns:
             cut = cutoff_frequency / nyq
             b, a = butter(order, cut, btype="low", output="ba", analog=False)
             if phase_shift:
@@ -41,18 +39,16 @@ class DataTransformation:
                 
         return df
 
-    def visualize_low_pass(self, movements: List = [], result_filepath: str = "."):
-        df_lowpass = self.df
-        df = self.df_original
+    def low_pass_filter_visualize(self, df_lowpass, movements: list = [], result_filepath: str = "."):
         movements = (
-            movements if movements else df.columns[df.columns.str.startswith("Label")]
+            movements if movements else self.df.columns[self.df.columns.str.startswith("Label")]
         )
         for movement in movements:
             all_movement_start_idx = list(
-                df[(df["Time difference (s)"] == 0)].index
-            ) + [df.shape[0]]
+                self.df[(self.df["Time difference (s)"] == 0)].index
+            ) + [self.df.shape[0]]
             movement_start_idx = list(
-                df[(df["Time difference (s)"] == 0) & (df[movement] == 1)].index
+                self.df[(self.df["Time difference (s)"] == 0) & (self.df[movement] == 1)].index
             )
 
             fig = make_subplots(
@@ -69,7 +65,7 @@ class DataTransformation:
                     idx = all_movement_start_idx.index(i)
                     start_idx = all_movement_start_idx[idx]
                     end_idx = all_movement_start_idx[idx + 1] - 1
-                    df_plot = df.loc[start_idx:end_idx]
+                    df_plot = self.df.loc[start_idx:end_idx]
                     df_plot_lowpass = df_lowpass.loc[start_idx:end_idx]
                     legend_flag = sensor_cnt == 4
                     fig.add_trace(
