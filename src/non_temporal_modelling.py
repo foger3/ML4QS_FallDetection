@@ -1,12 +1,15 @@
 import copy
-
+import seaborn as sn
+import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 from sklearn import metrics
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import GridSearchCV, train_test_split
+
 
 # This class creates dfs splits that can be used by classification learning algorithms.
 class ClassificationPrepareData:
@@ -147,6 +150,15 @@ class ClassificationEvaluation:
     @staticmethod
     def confusion_matrix(y_true, y_pred, labels):
         return metrics.confusion_matrix(y_true, y_pred, labels=labels)
+
+    @staticmethod
+    def confusion_matrix_visualize(cm, labels, filepath):
+        cm = cm / np.expand_dims(np.sum(cm, axis = 1), axis = 1)
+        df_cm = pd.DataFrame(cm, index = labels, columns = labels)
+        plt.figure(figsize = (9,5))
+        sn.set(font_scale=1)
+        sn.heatmap(df_cm, cmap="crest", annot=True, annot_kws={"size": 10})
+        plt.savefig(f"{filepath}")
 
 # Class features the most popular and best-performing classification algorithms.
 class ClassificationProcedure:
