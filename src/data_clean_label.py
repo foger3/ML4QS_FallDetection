@@ -178,6 +178,15 @@ def fill_missing_value(
     
     return df
 
+def assign_id_per_movement(
+    df: pd.DataFrame, based: int
+) -> pd.DataFrame:
+    movement_start_idx = list(df[df["Time difference (s)"] == 0].index) + [df.shape[0]]
+    df.insert(0, "ID", 0)
+    for i in range(len(movement_start_idx) - 1):
+        df.loc[movement_start_idx[i]:movement_start_idx[i+1], "ID"] = i
+
+    return df
 
 filepath = "/Users/thl/Downloads/"
 round_num = 3
@@ -210,4 +219,6 @@ for round in range(1, round_num + 1):
             df_cleaned.reset_index(level=0, drop=True, inplace = True)
             df_cleaned = pd.concat([df_cleaned, df_result], ignore_index=True)
 
+# assign id
+df_cleaned = assign_id_per_movement(df_cleaned)
 df_cleaned.to_csv(f"../dataset/data_cleaned_{granularity}.csv", index=False)

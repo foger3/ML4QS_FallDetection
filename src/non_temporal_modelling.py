@@ -8,7 +8,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import GridSearchCV, train_test_split
 
-
 # This class creates dfs splits that can be used by classification learning algorithms.
 class ClassificationPrepareData:
 
@@ -19,7 +18,8 @@ class ClassificationPrepareData:
     def assign_label(
         self, 
         df: pd.DataFrame, 
-        class_labels: list[str]
+        class_labels: list[str],
+        binary: bool = True
     ) -> pd.DataFrame:
         
         # Find which columns are relevant based on the possibly partial class_label specification.
@@ -30,11 +30,19 @@ class ClassificationPrepareData:
         # Determine how many class values are label as 'true' in our class columns.
         sum_values = df[labels].sum(axis=1)
         # Create a new 'class' column and set the value to the default class.
-        df['class'] = self.default_label
+        df[self.class_col] = self.default_label
         for i in range(0, len(df.index)):
             # If we have exactly one true class column, we can assign that value, otherwise we keep the default class.
             if sum_values[i] == 1:
                 df.iloc[i, df.columns.get_loc(self.class_col)] = df[labels].iloc[i].idxmax(axis=0)
+        
+        if binary:
+            class_binary = class_labels[-1]
+            df[self.class_col] = df[self.class_col].apply(
+                lambda x: class_binary if x == class_binary \
+                    else (str("Non ") + class_binary)
+            )
+        
         # And remove our old binary columns.
         df = df.drop(labels, axis=1)
 
@@ -44,6 +52,7 @@ class ClassificationPrepareData:
         self, 
         df: pd.DataFrame, 
         class_labels: list[str], 
+        binary: bool = True,
         matching: str = "like", 
         training_frac: float = 0.7, 
         filter: bool = True, 
@@ -53,7 +62,7 @@ class ClassificationPrepareData:
 
         # Create a single class column if we have the 'like' option.
         if matching == 'like':
-            df = self.assign_label(df, class_labels)
+            df = self.assign_label(df, class_labels, binary)
             class_labels = self.class_col
         elif len(class_labels) == 1:
             class_labels = class_labels[0]
@@ -76,9 +85,25 @@ class ClassificationPrepareData:
             test_set_y = df.iloc[end_training_set:len(df.index), class_label_indices]
         # For non temporal data we use a standard function to randomly split the df.
         else:
-            training_set_X, test_set_X, training_set_y, test_set_y = train_test_split(df.iloc[:,features],
-                                                                                      df.iloc[:,class_label_indices], test_size=(1-training_frac), stratify=df.iloc[:,class_label_indices], random_state=random_state)
-        
+            df_head = df.drop_duplicates("ID", ignore_index=True)
+            training_set_X, test_set_X, training_set_y, test_set_y = train_test_split(
+                            df_head.iloc[:, features],
+                            df_head.iloc[:, class_label_indices],
+                            test_size=(1-training_frac),
+                            stratify=df_head.iloc[:, class_label_indices],
+                            random_state=random_state,
+                        )
+            training_id = training_set_X["ID"].values
+            testing_id = test_set_X["ID"].values
+            training_set_X, training_set_y = (
+                df[df["ID"].isin(training_id)].iloc[:, features],
+                df[df["ID"].isin(training_id)].iloc[:, class_label_indices],
+            )
+            test_set_X, test_set_y = (
+                df[df["ID"].isin(testing_id)].iloc[:, features],
+                df[df["ID"].isin(testing_id)].iloc[:, class_label_indices],
+            )
+
         print('Training set length is: ', len(training_set_X.index))
         print('Test set length is: ', len(test_set_X.index))
         
@@ -118,12 +143,18 @@ class ClassificationProcedure:
         self,
         df: pd.DataFrame,
         class_labels: list[str],
+        binary: bool = True,
         selected: list[str] = None,
     ):
         prepare = ClassificationPrepareData()
-
-        self.train_X, self.test_X, self.train_y, self.test_y = prepare.split_classification(df, class_labels)
-        self.select = selected if selected is not None else self.train_X.columns
+        (
+            self.train_X, 
+            self.test_X, 
+            self.train_y, 
+            self.test_y
+        ) = prepare.split_classification(df, class_labels, binary)
+        self.select = selected if selected is not None \
+            else self.train_X.columns
 
     def feedforward_neural_network(
         self, 
@@ -135,7 +166,11 @@ class ClassificationProcedure:
         gridsearch: bool = True, 
         print_model_details: bool = False
     ) -> pd.DataFrame:
-        train_X, test_X, train_y = self.train_X[self.select], self.test_X[self.select], self.train_y
+        (
+            train_X, 
+            test_X, 
+            train_y 
+        ) = self.train_X[self.select], self.test_X[self.select], self.train_y
 
         if gridsearch:
             # With the current parameters for max_iter and Python 3 packages convergence is not always reached, therefore increased +1000.
@@ -173,7 +208,11 @@ class ClassificationProcedure:
         gridsearch: bool = True, 
         print_model_details: bool = False
     ) -> pd.DataFrame:
-        train_X, test_X, train_y = self.train_X[self.select], self.test_X[self.select], self.train_y
+        (
+            train_X, 
+            test_X, 
+            train_y 
+        ) = self.train_X[self.select], self.test_X[self.select], self.train_y
 
         if gridsearch:
             tuned_parameters = [{'kernel': ['rbf'], 'gamma': [1e-3, 1e-4],
@@ -209,7 +248,11 @@ class ClassificationProcedure:
         print_model_details: bool = False, 
         gridsearch: bool = True
     ) -> pd.DataFrame:
-        train_X, test_X, train_y = self.train_X[self.select], self.test_X[self.select], self.train_y
+        (
+            train_X, 
+            test_X, 
+            train_y 
+        ) = self.train_X[self.select], self.test_X[self.select], self.train_y
 
         if gridsearch:
             tuned_parameters = [{'min_samples_leaf': [2, 10, 50, 100, 200],
@@ -270,7 +313,12 @@ class ClassificationProcedure:
         self,
         max_features: int = 10
     ) -> list:
-        train_X, test_X, train_y, test_y = self.train_X[self.select], self.test_X[self.select], self.train_y, self.test_y
+        (
+            train_X, 
+            test_X, 
+            train_y, 
+            test_y 
+        ) = self.train_X[self.select], self.test_X[self.select], self.train_y, self.test_y
 
         # Start with no features.
         ordered_features, ordered_scores, selected_features  = [[] for _ in range(3)]
