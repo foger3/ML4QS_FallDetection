@@ -74,7 +74,7 @@ class OutlierDetectionDistribution:
 
         return mixture_df
 
-    def visualize_chauvenet_outlier(
+    def chauvenet_visualize(
         self,
         df_chauvenet: pd.DataFrame,
         movements: List = [],
