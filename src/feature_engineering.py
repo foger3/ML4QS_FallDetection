@@ -150,6 +150,7 @@ class FeatureAbstraction:
 
         # Normalize data & fit PCA based on number of components
         X_normalized = (df_copy - df_copy.mean()) / df_copy.std()
+        X_normalized.dropna(axis=1, inplace=True)
         pca = PCA(n_components=n_components)
         X_pca = pca.fit_transform(X_normalized)
 
