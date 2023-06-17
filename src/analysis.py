@@ -72,7 +72,7 @@ skip_points = int((1 - window_overlap) * int(float(5000) / milliseconds_per_inst
 final_df = df.iloc[::skip_points, :].reset_index(drop=True)
 
 ## PCA
-final_df = features.abstract_features_with_pca(final_df, label_columns)
+final_df = features.abstract_features_with_pca(final_df, label_columns, n_components=10)
 
 
 ### Feature Selection ###

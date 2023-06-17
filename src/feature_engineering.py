@@ -139,10 +139,33 @@ class FeatureAbstraction:
         return df
 
     def abstract_features_with_pca(
-        self, df: pd.DataFrame, label_columns: list[str]
+        self, df: pd.DataFrame, label_columns: list[str], n_components: int = 20
     ) -> pd.DataFrame:
-        # Find columns with high correlation (it takes some time)
+        
+        # Interpolate missing values as PCA cannot handle these
         df_copy = copy.deepcopy(df).interpolate().ffill().bfill()
+
+        # Drop columns not of interest for PCA
+        df_copy = df_copy.drop(["ID"] + label_columns, axis=1)
+
+        # Normalize data & fit PCA based on number of components
+        X_normalized = (df_copy - df_copy.mean()) / df_copy.std()
+        pca = PCA(n_components=n_components)
+        X_pca = pca.fit_transform(X_normalized)
+
+        # How much variance can we explain this way
+        print("{} components capture {} (%) of the feature's variance"
+              .format(n_components, pca.explained_variance_ratio_.sum().round(3)))
+
+        # Add PCA components to dataframe
+        collist = [f"PCA_Component_{i}" for i in range(n_components)]
+        X_pca = pd.DataFrame(X_pca, index=df.index, columns=collist)
+        df = pd.concat([df, X_pca], axis=1)
+
+        return df
+
+        # Find columns with high correlation (it takes some time)
+        # df_copy = copy.deepcopy(df).interpolate().ffill().bfill()
 
         # corrs = df_copy.corr()
         # columns = {}
@@ -157,82 +180,82 @@ class FeatureAbstraction:
 
         # # OR
 
-        columns = {
-            "Label Walking": [
-                "Accelerometer Y (m/s^2)",
-                "Accelerometer Y (m/s^2)_temp_mean_ws_500",
-                "Gyroscope X (rad/s)_temp_std_ws_500",
-                "Gyroscope X (rad/s)_temp_min_ws_500",
-                "Gyroscope X (rad/s)_temp_sem_ws_500",
-                "Accelerometer Y (m/s^2)_freq_0.0_Hz_ws_500",
-            ],
-            "Label Running": [
-                "Gyroscope Y (rad/s)_temp_std_ws_500",
-                "Gyroscope Z (rad/s)_temp_std_ws_500",
-                "Gyroscope Y (rad/s)_temp_min_ws_500",
-                "Gyroscope Y (rad/s)_temp_max_ws_500",
-                "Gyroscope Y (rad/s)_temp_sem_ws_500",
-                "Gyroscope Z (rad/s)_temp_sem_ws_500",
-            ],
-            "Label Sitting": [
-                "Accelerometer Y (m/s^2)",
-                "Magnetometer Y (µT)_temp_mean_ws_500",
-                "Accelerometer Y (m/s^2)_temp_mean_ws_500",
-                "Accelerometer Y (m/s^2)_temp_median_ws_500",
-                "Accelerometer Y (m/s^2)_temp_min_ws_500",
-                "Magnetometer Y (µT)_temp_max_ws_500",
-                "Accelerometer Y (m/s^2)_temp_max_ws_500",
-                "Magnetometer Y (µT)_freq_0.0_Hz_ws_500",
-                "Accelerometer Y (m/s^2)_freq_0.0_Hz_ws_500",
-            ],
-            "Label Falling": [
-                "Magnetometer Y (µT)_temp_std_ws_500",
-                "Accelerometer X (m/s^2)_temp_std_ws_500",
-                "Accelerometer Y (m/s^2)_temp_std_ws_500",
-                "Accelerometer Z (m/s^2)_temp_std_ws_500",
-                "Magnetometer Y (µT)_temp_sem_ws_500",
-                "Accelerometer X (m/s^2)_temp_sem_ws_500",
-                "Accelerometer Y (m/s^2)_temp_sem_ws_500",
-                "Accelerometer Z (m/s^2)_temp_sem_ws_500",
-            ],
-            "all": [
-                "Accelerometer Y (m/s^2)_freq_0.0_Hz_ws_500",
-                "Gyroscope Z (rad/s)_temp_std_ws_500",
-                "Gyroscope Y (rad/s)_temp_sem_ws_500",
-                "Accelerometer Z (m/s^2)_temp_sem_ws_500",
-                "Gyroscope Y (rad/s)_temp_std_ws_500",
-                "Magnetometer Y (µT)_temp_sem_ws_500",
-                "Gyroscope Y (rad/s)_temp_min_ws_500",
-                "Magnetometer Y (µT)_temp_max_ws_500",
-                "Accelerometer Y (m/s^2)_temp_max_ws_500",
-                "Accelerometer Y (m/s^2)_temp_sem_ws_500",
-                "Magnetometer Y (µT)_freq_0.0_Hz_ws_500",
-                "Accelerometer X (m/s^2)_temp_std_ws_500",
-                "Accelerometer Y (m/s^2)",
-                "Magnetometer Y (µT)_temp_mean_ws_500",
-                "Accelerometer Y (m/s^2)_temp_median_ws_500",
-                "Gyroscope Z (rad/s)_temp_sem_ws_500",
-                "Accelerometer Y (m/s^2)_temp_mean_ws_500",
-                "Magnetometer Y (µT)_temp_std_ws_500",
-                "Accelerometer X (m/s^2)_temp_sem_ws_500",
-                "Gyroscope X (rad/s)_temp_min_ws_500",
-                "Gyroscope X (rad/s)_temp_std_ws_500",
-                "Accelerometer Z (m/s^2)_temp_std_ws_500",
-                "Accelerometer Y (m/s^2)_temp_std_ws_500",
-                "Gyroscope Y (rad/s)_temp_max_ws_500",
-                "Accelerometer Y (m/s^2)_temp_min_ws_500",
-                "Gyroscope X (rad/s)_temp_sem_ws_500",
-            ],
-        }
+        # columns = {
+        #     "Label Walking": [
+        #         "Accelerometer Y (m/s^2)",
+        #         "Accelerometer Y (m/s^2)_temp_mean_ws_500",
+        #         "Gyroscope X (rad/s)_temp_std_ws_500",
+        #         "Gyroscope X (rad/s)_temp_min_ws_500",
+        #         "Gyroscope X (rad/s)_temp_sem_ws_500",
+        #         "Accelerometer Y (m/s^2)_freq_0.0_Hz_ws_500",
+        #     ],
+        #     "Label Running": [
+        #         "Gyroscope Y (rad/s)_temp_std_ws_500",
+        #         "Gyroscope Z (rad/s)_temp_std_ws_500",
+        #         "Gyroscope Y (rad/s)_temp_min_ws_500",
+        #         "Gyroscope Y (rad/s)_temp_max_ws_500",
+        #         "Gyroscope Y (rad/s)_temp_sem_ws_500",
+        #         "Gyroscope Z (rad/s)_temp_sem_ws_500",
+        #     ],
+        #     "Label Sitting": [
+        #         "Accelerometer Y (m/s^2)",
+        #         "Magnetometer Y (µT)_temp_mean_ws_500",
+        #         "Accelerometer Y (m/s^2)_temp_mean_ws_500",
+        #         "Accelerometer Y (m/s^2)_temp_median_ws_500",
+        #         "Accelerometer Y (m/s^2)_temp_min_ws_500",
+        #         "Magnetometer Y (µT)_temp_max_ws_500",
+        #         "Accelerometer Y (m/s^2)_temp_max_ws_500",
+        #         "Magnetometer Y (µT)_freq_0.0_Hz_ws_500",
+        #         "Accelerometer Y (m/s^2)_freq_0.0_Hz_ws_500",
+        #     ],
+        #     "Label Falling": [
+        #         "Magnetometer Y (µT)_temp_std_ws_500",
+        #         "Accelerometer X (m/s^2)_temp_std_ws_500",
+        #         "Accelerometer Y (m/s^2)_temp_std_ws_500",
+        #         "Accelerometer Z (m/s^2)_temp_std_ws_500",
+        #         "Magnetometer Y (µT)_temp_sem_ws_500",
+        #         "Accelerometer X (m/s^2)_temp_sem_ws_500",
+        #         "Accelerometer Y (m/s^2)_temp_sem_ws_500",
+        #         "Accelerometer Z (m/s^2)_temp_sem_ws_500",
+        #     ],
+        #     "all": [
+        #         "Accelerometer Y (m/s^2)_freq_0.0_Hz_ws_500",
+        #         "Gyroscope Z (rad/s)_temp_std_ws_500",
+        #         "Gyroscope Y (rad/s)_temp_sem_ws_500",
+        #         "Accelerometer Z (m/s^2)_temp_sem_ws_500",
+        #         "Gyroscope Y (rad/s)_temp_std_ws_500",
+        #         "Magnetometer Y (µT)_temp_sem_ws_500",
+        #         "Gyroscope Y (rad/s)_temp_min_ws_500",
+        #         "Magnetometer Y (µT)_temp_max_ws_500",
+        #         "Accelerometer Y (m/s^2)_temp_max_ws_500",
+        #         "Accelerometer Y (m/s^2)_temp_sem_ws_500",
+        #         "Magnetometer Y (µT)_freq_0.0_Hz_ws_500",
+        #         "Accelerometer X (m/s^2)_temp_std_ws_500",
+        #         "Accelerometer Y (m/s^2)",
+        #         "Magnetometer Y (µT)_temp_mean_ws_500",
+        #         "Accelerometer Y (m/s^2)_temp_median_ws_500",
+        #         "Gyroscope Z (rad/s)_temp_sem_ws_500",
+        #         "Accelerometer Y (m/s^2)_temp_mean_ws_500",
+        #         "Magnetometer Y (µT)_temp_std_ws_500",
+        #         "Accelerometer X (m/s^2)_temp_sem_ws_500",
+        #         "Gyroscope X (rad/s)_temp_min_ws_500",
+        #         "Gyroscope X (rad/s)_temp_std_ws_500",
+        #         "Accelerometer Z (m/s^2)_temp_std_ws_500",
+        #         "Accelerometer Y (m/s^2)_temp_std_ws_500",
+        #         "Gyroscope Y (rad/s)_temp_max_ws_500",
+        #         "Accelerometer Y (m/s^2)_temp_min_ws_500",
+        #         "Gyroscope X (rad/s)_temp_sem_ws_500",
+        #     ],
+        # }
 
-        # Append pca result into data
-        for key, value in columns.items():
-            X = df_copy[value]
-            X_normalized = (X - X.mean()) / X.std()
-            n_components = len(value) - 1
-            pca = PCA(n_components=n_components)
-            X_pca = pca.fit_transform(X_normalized)
-            collist = [f"pca_{key}_{i}" for i in range(n_components)]
-            X_pca = pd.DataFrame(X_pca, index=df.index, columns=collist)
-            df = pd.concat([df, X_pca], axis=1)
-        return df
+        # # Append pca result into data
+        # for key, value in columns.items():
+        #     X = df_copy[value]
+        #     X_normalized = (X - X.mean()) / X.std()
+        #     n_components = len(value) - 1
+        #     pca = PCA(n_components=n_components)
+        #     X_pca = pca.fit_transform(X_normalized)
+        #     collist = [f"pca_{key}_{i}" for i in range(n_components)]
+        #     X_pca = pd.DataFrame(X_pca, index=df.index, columns=collist)
+        #     df = pd.concat([df, X_pca], axis=1)
+        # return df
