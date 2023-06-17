@@ -60,9 +60,9 @@ class ClassificationPrepareData:
         df: pd.DataFrame, 
         class_labels: list[str], 
         matching: str = "like", 
+        temporal: bool = False,
         training_frac: float = 0.7, 
-        filter: bool = True, 
-        temporal: bool = False, 
+        filter: bool = True,  
         random_state: int = 0
     )-> pd.DataFrame:
 
@@ -156,6 +156,7 @@ class ClassificationProcedure:
         df: pd.DataFrame,
         class_labels: list[str],
         matching: str = "like",
+        temporal: bool = False,
         selected: list[str] = None,
     ):
         prepare = ClassificationPrepareData()
@@ -164,7 +165,7 @@ class ClassificationProcedure:
             self.test_X, 
             self.train_y, 
             self.test_y
-        ) = prepare.split_classification(df, class_labels, matching)
+        ) = prepare.split_classification(df, class_labels, matching, temporal)
         self.select = selected if selected is not None \
             else self.train_X.columns
 

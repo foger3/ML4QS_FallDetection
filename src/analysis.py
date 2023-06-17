@@ -18,7 +18,11 @@ label_columns = [col for col in df.columns[16:]]
 milliseconds_per_instance = (
     df.loc[1, "Time difference (s)"] * 1000
 )  # Compute number of milliseconds covered by an instance
-matching = "binary" # Binarize Classification(?)
+
+# Define whether to use binary classification / temporal split
+matching = "binary" # "like" for multi-class classification
+temporal = False # False for non-temporal train/test split
+
 
 ### Descriptive Analysis ###
 _ = describe(df)
@@ -70,36 +74,35 @@ df = features.abstract_frequency(copy.deepcopy(df), sensor_columns)
 window_overlap = 0.95
 skip_points = int((1 - window_overlap) * int(float(5000) / milliseconds_per_instance))
 final_df = df.iloc[::skip_points, :].reset_index(drop=True)
+# Further measure to account for overlap when randomizing the dataset
+final_df["ID"]= (final_df.index / 50 + 1).astype(int)
 
 ## PCA
 final_df = features.abstract_features_with_pca(final_df, label_columns, n_components=10)
 
 
 ### Feature Selection ###
-class_feature = ClassificationProcedure(final_df, label_columns, matching)
+class_feature = ClassificationProcedure(
+    final_df, label_columns, matching, temporal
+)
 selected_features, _, _ = class_feature.forward_selection(max_features=10)
 
-selected_features = [
-    "Accelerometer Y (m/s^2)_temp_min_ws_500",
-    "Accelerometer X (m/s^2)_temp_min_ws_500",
-    "Accelerometer Y (m/s^2)_freq_0.0_Hz_ws_500",
-    "Accelerometer Z (m/s^2)_temp_max_ws_500",
-    "Magnetometer Z (µT)_temp_median_ws_500",
-    "Accelerometer Z (m/s^2)_temp_min_ws_500",
-    "Accelerometer X (m/s^2)",
-    "Accelerometer Z (m/s^2)_temp_median_ws_500",
-    "Magnetometer Z (µT)_temp_min_ws_500",
-    "Accelerometer X (m/s^2)_temp_mean_ws_500",
-    "Magnetometer X (µT)_freq_48.6_Hz_ws_500",
-    "Accelerometer Y (m/s^2)_freq_2.6_Hz_ws_500",
-    "Gyroscope X (rad/s)_freq_5.8_Hz_ws_500",
-    "Accelerometer X (m/s^2)_freq_3.4_Hz_ws_500",
-    "Accelerometer X (m/s^2)_freq_24.4_Hz_ws_500",
-]
+# selected_features = ['Accelerometer X (m/s^2)', 
+#                      'PCA_Component_7', 
+#                      'Magnetometer Z (µT)_temp_mean_ws_500', 
+#                      'Magnetometer X (µT)_temp_median_ws_500',
+#                      'Magnetometer Z (µT)',
+#                      'Barometer X (hPa)_temp_mean_ws_500', 
+#                      'Magnetometer Y (µT)', 
+#                      'PCA_Component_4', 
+#                      'Accelerometer X (m/s^2)_temp_mean_ws_500', 
+#                      'Gyroscope Z (rad/s)']
 
 
 ### Non-temporal Predictive Modelling ###
-class_pro = ClassificationProcedure(final_df, label_columns, matching, selected_features)
+class_pro = ClassificationProcedure(
+    final_df, label_columns, matching, temporal, selected_features
+)
 class_eval = ClassificationEvaluation()
 
 performance_tr_nn, performance_te_nn = 0, 0
@@ -140,12 +143,5 @@ for repeat in range(n_cv_rep):
 
     performance_tr_svm += class_eval.accuracy(class_pro.train_y, class_train_y)
     performance_te_svm += class_eval.accuracy(class_pro.test_y, class_test_y)
-
-overall_performance_tr_nn = performance_tr_nn / n_cv_rep
-overall_performance_te_nn = performance_te_nn / n_cv_rep
-overall_performance_tr_rf = performance_tr_rf / n_cv_rep
-overall_performance_te_rf = performance_te_rf / n_cv_rep
-overall_performance_tr_svm = performance_tr_svm / n_cv_rep
-overall_performance_te_svm = performance_te_svm / n_cv_rep
 
 class_eval.confusion_matrix(class_pro.test_y, class_test_y, class_train_prob_y.columns)
