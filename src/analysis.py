@@ -20,7 +20,7 @@ milliseconds_per_instance = (
 )  # Compute number of milliseconds covered by an instance
 
 # Define whether to use binary classification / temporal split
-matching = "binary" # "like" for multi-class classification
+matching = "like" # "like" for multi-class classification
 temporal = False # False for non-temporal train/test split
 
 
@@ -73,10 +73,11 @@ window_overlap = 0.95
 skip_points = int((1 - window_overlap) * int(float(5000) / milliseconds_per_instance))
 final_df = df.iloc[::skip_points, :].reset_index(drop=True)
 # Further measure to account for overlap when randomizing the dataset
-final_df["ID"]= (final_df.index / 50 + 1).astype(int)
+chunk_size = 10
+final_df["ID"]= (final_df.index / chunk_size + 1).astype(int)
 
 ## PCA
-final_df = features.abstract_features_with_pca(final_df, label_columns, n_components=10)
+final_df, pca_cols = features.abstract_features_with_pca(final_df, label_columns, n_components=9)
 
 
 ### Feature Selection ###

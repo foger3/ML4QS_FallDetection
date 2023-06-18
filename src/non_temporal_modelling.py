@@ -242,7 +242,8 @@ class ClassificationProcedure:
         if gridsearch:
             tuned_parameters = [{'kernel': ['linear', 'sigmoid', 'poly', 'rbf'], 
                                  'gamma': [1e-3, 1e-4],
-                                 'C': [1, 10, 100]}]
+                                 'C': [1, 10, 100],
+                                 'class_weight':['balanced']}]
             svm = GridSearchCV(SVC(probability=True), tuned_parameters, cv=5, scoring='accuracy')
         else:
             svm = SVC(C=C, kernel=kernel, gamma=gamma, probability=True, cache_size=7000)
@@ -283,7 +284,8 @@ class ClassificationProcedure:
         if gridsearch:
             tuned_parameters = [{'min_samples_leaf': [2, 10, 50, 100, 200],
                                  'n_estimators':[10, 50, 100],
-                                 'criterion':['gini', 'entropy']}]
+                                 'criterion':['gini', 'entropy'],
+                                 'class_weight':['balanced']}]
             rf = GridSearchCV(RandomForestClassifier(), tuned_parameters, cv=5, scoring='accuracy')
         else:
             rf = RandomForestClassifier(n_estimators=n_estimators, min_samples_leaf=min_samples_leaf, criterion=criterion)
