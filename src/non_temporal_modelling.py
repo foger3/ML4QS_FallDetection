@@ -115,9 +115,9 @@ class ClassificationPrepareData:
                 df[df["ID"].isin(testing_id)].iloc[:, features],
                 df[df["ID"].isin(testing_id)].iloc[:, class_label_indices],
             )
-
-            for df_i in [training_set_X, test_set_X]:
-                df_i = df_i.drop(["ID"], axis=1, inplace=True)
+        
+        for df_i in [training_set_X, test_set_X]:
+            df_i = df_i.drop(["ID"], axis=1, inplace=True)
 
         print('Training set length is: ', len(training_set_X.index))
         print('Test set length is: ', len(test_set_X.index))
