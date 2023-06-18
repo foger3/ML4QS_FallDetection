@@ -10,16 +10,16 @@ class DataTransformation:
         self.columns = columns
 
     # Interpolate the dataset based on previous/next values..
-    # @staticmethod
-    def impute_interpolate(self) -> pd.DataFrame:
-        df = self.df.copy()
-        df[self.columns] = df[self.columns].interpolate().ffill().bfill()
+    @staticmethod
+    def impute_interpolate(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+        df[columns] = df[columns].interpolate().ffill().bfill()
 
         return df
     
-    # @staticmethod
+    @staticmethod
     def low_pass_filter(
-        self,
+        df: pd.DataFrame, 
+        columns: list[str],
         sampling_frequency: float,
         cutoff_frequency: float = 1.5,
         order: int = 10,
@@ -27,9 +27,8 @@ class DataTransformation:
     ) -> pd.DataFrame:
         # http://stackoverflow.com/questions/12093594/how-to-implement-band-pass-butterworth-filter-with-scipy-signal-butter
         # Cutoff frequencies are expressed as the fraction of the Nyquist frequency, which is half the sampling frequency
-        df = self.df.copy()
         nyq = 0.5 * sampling_frequency
-        for col in self.columns:
+        for col in columns:
             cut = cutoff_frequency / nyq
             b, a = butter(order, cut, btype="low", output="ba", analog=False)
             if phase_shift:
