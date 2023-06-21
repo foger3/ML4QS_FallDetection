@@ -29,13 +29,13 @@ _ = describe(df)
 
 # Reduce df to relevant data (cut out time and linear acceleration - essentially same as accelerometer)
 df = df[["ID"] + sensor_columns + label_columns]
-# [col for col in df.columns]
+# df = df[sensor_columns + label_columns]
 
 
 ### Noise Handling ###
 ## Outlier Analysis
 outlier = OutlierDetectionDistribution(df, sensor_columns)
-chauvenet_df = outlier.chauvenet(C=2)
+chauvenet_df = outlier.chauvenet(C=10)
 # outlier.chauvenet_visualize(chauvenet_df)
 mixture_df = outlier.mixture_model(n_components=3)
 
@@ -78,45 +78,45 @@ chunk_size = 100
 final_df["ID"]= (final_df.index / chunk_size + 1).astype(int)
 
 ## PCA
-final_df, pca_cols = features.abstract_features_with_pca(final_df, label_columns, n_components=9)
+final_df, pca_cols = features.abstract_features_with_pca(final_df, label_columns, n_components=370)
 
 
 ### Feature Selection ###
 class_feature = ClassificationProcedure(
     final_df, label_columns, matching, temporal
 )
-selected_features, _, _ = class_feature.forward_selection(max_features=5)
+selected_features, _, _ = class_feature.forward_selection(max_features=30)
 
-selected_features = ["Accelerometer Y (m/s^2)_temp_min_ws_500",
-                     "Magnetometer Z (µT)",
-                     "Magnetometer Z (µT)_temp_std_ws_500",
-                     "Magnetometer Z (µT)_temp_mean_ws_500",
-                     "Barometer X (hPa)_freq_0.2_Hz_ws_500",
-                     "Accelerometer Y (m/s^2)_pse",
-                     "Magnetometer Y (µT)_freq_43.2_Hz_ws_500",
-                     "Magnetometer Z (µT)_freq_35.0_Hz_ws_500",
-                     "Accelerometer Z (m/s^2)_freq_47.0_Hz_ws_500",
-                     "Accelerometer Y (m/s^2)_freq_43.0_Hz_ws_500",
-                     "Barometer X (hPa)_freq_4.2_Hz_ws_500",
-                     "Magnetometer Z (µT)_freq_5.4_Hz_ws_500",
-                     "Barometer X (hPa)_freq_6.6_Hz_ws_500",
-                     "Magnetometer Y (µT)_freq_40.6_Hz_ws_500",
-                     "Accelerometer X (m/s^2)_freq_44.0_Hz_ws_500",
-                     "Gyroscope X (rad/s)_freq_21.4_Hz_ws_500",
-                     "Magnetometer Y (µT)_freq_8.4_Hz_ws_500",
-                     "Accelerometer Y (m/s^2)_freq_12.8_Hz_ws_500",
-                     "Gyroscope Z (rad/s)_freq_17.0_Hz_ws_500",
-                     "PCA_Component_1",
-                     "Accelerometer Z (m/s^2)_freq_2.2_Hz_ws_500",
-                     "Magnetometer X (µT)_freq_14.6_Hz_ws_500",
-                     "Accelerometer Y (m/s^2)_freq_44.0_Hz_ws_500",
-                     "Gyroscope X (rad/s)_freq_32.2_Hz_ws_500",
-                     "Gyroscope X (rad/s)_freq_12.8_Hz_ws_500",
-                     "Magnetometer Z (µT)_freq_11.8_Hz_ws_500",
-                     "Gyroscope Z (rad/s)_freq_11.2_Hz_ws_500",
-                     "Barometer X (hPa)_freq_48.6_Hz_ws_500",
-                     "Accelerometer Y (m/s^2)_freq_35.0_Hz_ws_500",
-                     "Accelerometer X (m/s^2)_freq_34.4_Hz_ws_500",]
+selected_features = ['Accelerometer Y (m/s^2)_temp_min_ws_500', 
+                     'Accelerometer Z (m/s^2)_temp_mean_ws_500', 
+                     'Accelerometer Y (m/s^2)_freq_0.0_Hz_ws_500', 
+                     'Accelerometer Y (m/s^2)_temp_max_ws_500', 
+                     'Magnetometer Z (µT)_temp_mean_ws_500', 
+                     'Accelerometer Z (m/s^2)_freq_26.6_Hz_ws_500', 
+                     'Accelerometer Y (m/s^2)_freq_47.0_Hz_ws_500',
+                     'Magnetometer X (µT)_freq_32.8_Hz_ws_500',
+                     'Magnetometer Z (µT)_temp_max_ws_500',
+                     'Barometer X (hPa)_freq_6.0_Hz_ws_500',
+                     'Gyroscope Z (rad/s)_freq_2.0_Hz_ws_500', 
+                     'Accelerometer Z (m/s^2)_freq_43.0_Hz_ws_500', 
+                     'Magnetometer Y (µT)_freq_20.4_Hz_ws_500', 
+                     'Magnetometer X (µT)_freq_45.0_Hz_ws_500', 
+                     'Magnetometer Y (µT)_freq_49.0_Hz_ws_500', 
+                     'Accelerometer Z (m/s^2)_freq_39.0_Hz_ws_500', 
+                     'Magnetometer X (µT)_freq_2.6_Hz_ws_500', 
+                     'PCA_Component_138', 
+                     'Magnetometer Z (µT)_freq_50.0_Hz_ws_500', 
+                     'Barometer X (hPa)_freq_34.0_Hz_ws_500', 
+                     'Magnetometer X (µT)_freq_24.4_Hz_ws_500', 
+                     'Magnetometer Z (µT)_freq_46.0_Hz_ws_500', 
+                     'Accelerometer X (m/s^2)_freq_7.2_Hz_ws_500', 
+                     'Accelerometer Z (m/s^2)_freq_33.0_Hz_ws_500',
+                     'Gyroscope Z (rad/s)_freq_48.4_Hz_ws_500', 
+                     'Barometer X (hPa)_freq_20.8_Hz_ws_500', 
+                     'Barometer X (hPa)_freq_39.4_Hz_ws_500', 
+                     'Magnetometer Z (µT)_freq_7.4_Hz_ws_500', 
+                     'Magnetometer X (µT)_freq_41.6_Hz_ws_500', 
+                     'Accelerometer Z (m/s^2)_freq_36.0_Hz_ws_500']
 
 
 ### Non-temporal Predictive Modelling ###
@@ -166,3 +166,36 @@ for repeat in range(n_cv_rep):
 
 cm = class_eval.confusion_matrix(class_pro.test_y, class_test_y, class_train_prob_y.columns)
 class_eval.confusion_matrix_visualize(cm, [col.split(" ")[1] for col in class_train_prob_y.columns], "./cm_rf.png")
+
+
+# Old selected features
+# selected_features = ["Accelerometer Y (m/s^2)_temp_min_ws_500",
+#                      "Magnetometer Z (µT)",
+#                      "Magnetometer Z (µT)_temp_std_ws_500",
+#                      "Magnetometer Z (µT)_temp_mean_ws_500",
+#                      "Barometer X (hPa)_freq_0.2_Hz_ws_500",
+#                      "Accelerometer Y (m/s^2)_pse",
+#                      "Magnetometer Y (µT)_freq_43.2_Hz_ws_500",
+#                      "Magnetometer Z (µT)_freq_35.0_Hz_ws_500",
+#                      "Accelerometer Z (m/s^2)_freq_47.0_Hz_ws_500",
+#                      "Accelerometer Y (m/s^2)_freq_43.0_Hz_ws_500",
+#                      "Barometer X (hPa)_freq_4.2_Hz_ws_500",
+#                      "Magnetometer Z (µT)_freq_5.4_Hz_ws_500",
+#                      "Barometer X (hPa)_freq_6.6_Hz_ws_500",
+#                      "Magnetometer Y (µT)_freq_40.6_Hz_ws_500",
+#                      "Accelerometer X (m/s^2)_freq_44.0_Hz_ws_500",
+#                      "Gyroscope X (rad/s)_freq_21.4_Hz_ws_500",
+#                      "Magnetometer Y (µT)_freq_8.4_Hz_ws_500",
+#                      "Accelerometer Y (m/s^2)_freq_12.8_Hz_ws_500",
+#                      "Gyroscope Z (rad/s)_freq_17.0_Hz_ws_500",
+#                      "PCA_Component_1",
+#                      "Accelerometer Z (m/s^2)_freq_2.2_Hz_ws_500",
+#                      "Magnetometer X (µT)_freq_14.6_Hz_ws_500",
+#                      "Accelerometer Y (m/s^2)_freq_44.0_Hz_ws_500",
+#                      "Gyroscope X (rad/s)_freq_32.2_Hz_ws_500",
+#                      "Gyroscope X (rad/s)_freq_12.8_Hz_ws_500",
+#                      "Magnetometer Z (µT)_freq_11.8_Hz_ws_500",
+#                      "Gyroscope Z (rad/s)_freq_11.2_Hz_ws_500",
+#                      "Barometer X (hPa)_freq_48.6_Hz_ws_500",
+#                      "Accelerometer Y (m/s^2)_freq_35.0_Hz_ws_500",
+#                      "Accelerometer X (m/s^2)_freq_34.4_Hz_ws_500",]

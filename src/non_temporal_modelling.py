@@ -341,12 +341,7 @@ class ClassificationProcedure:
         self,
         max_features: int = 10
     ) -> list:
-        (
-            train_X, 
-            test_X, 
-            train_y, 
-            test_y 
-        ) = self.train_X[self.select], self.test_X[self.select], self.train_y, self.test_y
+        train_X, train_y = self.train_X, self.train_y
 
         # Start with no features.
         ordered_features, ordered_scores, selected_features  = [[] for _ in range(3)]
@@ -364,10 +359,10 @@ class ClassificationProcedure:
                 temp_selected_features.append(f)
 
                 # Determine the accuracy of a decision tree learner if we were to add the feature.
-                _, pred_y_test, _, _ = self.decision_tree(train_X[temp_selected_features],
+                pred_y_train, _, _, _ = self.decision_tree(train_X[temp_selected_features],
                                                           train_y,
-                                                          test_X[temp_selected_features])
-                perf = ClassificationEvaluation.accuracy(test_y, pred_y_test)
+                                                          train_X[temp_selected_features])
+                perf = ClassificationEvaluation.accuracy(train_y, pred_y_train)
 
                 # If the performance is better than what we have seen so far (we aim for high accuracy)
                 # we set the current feature to the best feature and the same for the best performance.
