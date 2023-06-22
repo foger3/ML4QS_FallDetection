@@ -5,8 +5,7 @@ from descriptives import describe
 from outlier_detection import OutlierDetectionDistribution
 from data_transformation import DataTransformation
 from feature_engineering import FeatureAbstraction
-from non_temporal_modelling import ClassificationProcedure, ClassificationEvaluation
-
+from modelling import NonTemporalClassification, TemporalClassification, ClassificationEvaluation
 
 ## ANALYSIS SECTION: Combining function from other modules ##
 ### Read in cleaned data and defined reoccruing objects ###
@@ -67,7 +66,7 @@ for feature in [
 
 ## Frequency Domain
 df = features.abstract_frequency(copy.deepcopy(df), sensor_columns)
-# df = pd.read_pickle("c:\\Users\\lucat\\OneDrive\\Dokumente\\Uni Amsterdam\\ml4qs_full_df.pkl")
+# df = pd.read_pickle("c:\\Users\\lucat\\OneDrive\\Documents\\Uni Amsterdam\\ml4qs_full_df.pkl")
 
 ## Overlap: The percentage of overlap we allow: 90%
 window_overlap = 0.9
@@ -82,7 +81,7 @@ final_df, pca_cols = features.abstract_features_with_pca(final_df, label_columns
 
 
 ### Feature Selection ###
-class_feature = ClassificationProcedure(
+class_feature = NonTemporalClassification(
     final_df, label_columns, matching, temporal
 )
 selected_features, _, _ = class_feature.forward_selection(max_features=30)
@@ -120,7 +119,7 @@ selected_features = ['Accelerometer Y (m/s^2)_temp_min_ws_500',
 
 
 ### Non-temporal Predictive Modelling ###
-class_pro = ClassificationProcedure(
+class_pro = NonTemporalClassification(
     final_df, label_columns, matching, temporal, selected_features
 )
 class_eval = ClassificationEvaluation()
@@ -131,17 +130,6 @@ performance_tr_svm, performance_te_svm = 0, 0
 
 n_cv_rep = 1
 for repeat in range(n_cv_rep):
-    print("Training NeuralNetwork run {} / {} ... ".format(repeat, n_cv_rep))
-    (
-        class_train_y,
-        class_test_y,
-        class_train_prob_y,
-        class_test_prob_y,
-    ) = class_pro.feedforward_neural_network(gridsearch=True)
-
-    performance_tr_nn += class_eval.accuracy(class_pro.train_y, class_train_y)
-    performance_te_nn += class_eval.accuracy(class_pro.test_y, class_test_y)
-
     print("Training RandomForest run {} / {} ... ".format(repeat, n_cv_rep))
     (
         class_train_y,
@@ -167,35 +155,3 @@ for repeat in range(n_cv_rep):
 cm = class_eval.confusion_matrix(class_pro.test_y, class_test_y, class_train_prob_y.columns)
 class_eval.confusion_matrix_visualize(cm, [col.split(" ")[1] for col in class_train_prob_y.columns], "./cm_rf.png")
 
-
-# Old selected features
-# selected_features = ["Accelerometer Y (m/s^2)_temp_min_ws_500",
-#                      "Magnetometer Z (µT)",
-#                      "Magnetometer Z (µT)_temp_std_ws_500",
-#                      "Magnetometer Z (µT)_temp_mean_ws_500",
-#                      "Barometer X (hPa)_freq_0.2_Hz_ws_500",
-#                      "Accelerometer Y (m/s^2)_pse",
-#                      "Magnetometer Y (µT)_freq_43.2_Hz_ws_500",
-#                      "Magnetometer Z (µT)_freq_35.0_Hz_ws_500",
-#                      "Accelerometer Z (m/s^2)_freq_47.0_Hz_ws_500",
-#                      "Accelerometer Y (m/s^2)_freq_43.0_Hz_ws_500",
-#                      "Barometer X (hPa)_freq_4.2_Hz_ws_500",
-#                      "Magnetometer Z (µT)_freq_5.4_Hz_ws_500",
-#                      "Barometer X (hPa)_freq_6.6_Hz_ws_500",
-#                      "Magnetometer Y (µT)_freq_40.6_Hz_ws_500",
-#                      "Accelerometer X (m/s^2)_freq_44.0_Hz_ws_500",
-#                      "Gyroscope X (rad/s)_freq_21.4_Hz_ws_500",
-#                      "Magnetometer Y (µT)_freq_8.4_Hz_ws_500",
-#                      "Accelerometer Y (m/s^2)_freq_12.8_Hz_ws_500",
-#                      "Gyroscope Z (rad/s)_freq_17.0_Hz_ws_500",
-#                      "PCA_Component_1",
-#                      "Accelerometer Z (m/s^2)_freq_2.2_Hz_ws_500",
-#                      "Magnetometer X (µT)_freq_14.6_Hz_ws_500",
-#                      "Accelerometer Y (m/s^2)_freq_44.0_Hz_ws_500",
-#                      "Gyroscope X (rad/s)_freq_32.2_Hz_ws_500",
-#                      "Gyroscope X (rad/s)_freq_12.8_Hz_ws_500",
-#                      "Magnetometer Z (µT)_freq_11.8_Hz_ws_500",
-#                      "Gyroscope Z (rad/s)_freq_11.2_Hz_ws_500",
-#                      "Barometer X (hPa)_freq_48.6_Hz_ws_500",
-#                      "Accelerometer Y (m/s^2)_freq_35.0_Hz_ws_500",
-#                      "Accelerometer X (m/s^2)_freq_34.4_Hz_ws_500",]
