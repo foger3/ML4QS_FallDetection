@@ -6,17 +6,20 @@ from outlier_detection import OutlierDetectionDistribution
 from data_transformation import DataTransformation
 from feature_engineering import FeatureAbstraction
 from modelling import NonTemporalClassification, TemporalClassification, ClassificationEvaluation
+class_eval = ClassificationEvaluation()
 
 ## ANALYSIS SECTION: Combining function from other modules ##
 ### Read in cleaned data and defined reoccruing objects ###
 df = pd.read_csv("../dataset/data_cleaned.csv")
 sensor_columns = [
     col for col in df.columns[3:16] if "Linear" not in col
-]  # [col for col in df.columns[2:15]]
-label_columns = [col for col in df.columns[16:]]
+]
+label_columns = sorted(
+    [col for col in df.columns[16:]]
+)
 milliseconds_per_instance = (
     df.loc[1, "Time difference (s)"] * 1000
-)  # Compute number of milliseconds covered by an instance
+) # Compute number of milliseconds covered by an instance
 
 # Define whether to use binary classification / temporal split
 matching = "like" # "like" for multi-class classification
@@ -26,9 +29,11 @@ temporal = True # False for non-temporal train/test split
 ### Descriptive Analysis ###
 _ = describe(df)
 
-# Reduce df to relevant data (cut out time and linear acceleration - essentially same as accelerometer)
+# Reduce df to relevant data (cut out time and linear acceleration)
+# Prep: Non-temporal classification
 df = df[["ID"] + sensor_columns + label_columns]
-# df = df[sensor_columns + label_columns]
+# Prep: Temporal classification
+df = df[sensor_columns + label_columns]
 
 
 ### Noise Handling ###
@@ -123,9 +128,7 @@ selected_features = ['Accelerometer Y (m/s^2)_temp_min_ws_500',
 class_pro = NonTemporalClassification(
     final_df, label_columns, matching, temporal, selected_features
 )
-class_eval = ClassificationEvaluation()
 
-performance_tr_nn, performance_te_nn = 0, 0
 performance_tr_rf, performance_te_rf = 0, 0
 performance_tr_svm, performance_te_svm = 0, 0
 cm_te_rf = np.zeros((len(label_columns), len(label_columns)))
@@ -163,3 +166,24 @@ print("RandomForest train accurancy ({} times average) : {}".format(n_cv_rep, pe
 print("RandomForest test accurancy ({} times average) : {}".format(n_cv_rep, performance_te_rf/n_cv_rep))
 class_eval.confusion_matrix_visualize(cm_te_rf/n_cv_rep, [col.split(" ")[1] for col in class_train_prob_y.columns], "./cm_rf.png")
 
+
+### Temporal Predictive Modelling ###
+class_nn = TemporalClassification(
+                            df, 
+                            label_columns, 
+                            step=5, # controls overlap (depending on interval)
+                            time_intervals=int(float(300) / milliseconds_per_instance)
+                        )
+
+# Manual Fitting Example
+class_nn.time_conv_lstm(print_model_details=False)
+model, hist = class_nn.fit(epochs=5, batch_size=128)
+result = class_nn.prediction(model)
+
+# Automatic Fitting (above can be skipped, only when individual components are investigated)
+_, _, result = class_nn.fit_predict(model="time_conv_lstm", epochs=10, batch_size=128)
+
+# Evaluate FItting
+class_eval.confusion_matrix_visualize(result, 
+                                      [col.split(" ")[1] for col in label_columns], 
+                                      "./cm_rf.png")

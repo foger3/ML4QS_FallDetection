@@ -1,12 +1,13 @@
 import copy
+import numpy as np 
 import pandas as pd
-import torch.nn.functional as F
-from torch import nn
-from torch.nn.utils import weight_norm
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import confusion_matrix
+from keras.models import Sequential
+from keras import layers, optimizers
 
 from prepare import ClassificationPrepareData, ClassificationEvaluation
 
@@ -187,78 +188,180 @@ class NonTemporalClassification:
             print("  - {}".format(name))
 
         return selected_features, ordered_features, ordered_scores
+
+
+# Class features two recurrent neural network models: 
+class TemporalClassification:
+
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        class_labels: list[str],
+        step: int = 5,
+        time_intervals: int = 50
+    ):    
+        if time_intervals % 5 != 0:
+            raise ValueError("Time intervals must be divisible by 5.")
+        
+        self.model = None
+        prepare = ClassificationPrepareData()
+        (
+            self.train_X, 
+            self.test_X,
+            self.train_y, 
+            self.test_y
+        ) = prepare.split_classification_nn(df, class_labels, step, time_intervals)
+        self.input = [self.train_X.shape[1], self.train_X.shape[2]]
+        
+    def lstm(self, print_model_details: bool = False) -> None:
+        model = Sequential([
+            layers.LSTM(units = 128, input_shape = (self.input[0], self.input[1])), # RNN layer
+            layers.Dropout(0.5), # Dropout layer for regularization
+            layers.Dense(units = 64, activation='relu'), # Hidden dense layer with ReLu
+            layers.Dense(self.train_y.shape[1], activation = 'softmax') # Softmax layer
+        ])
+        
+        if print_model_details:
+            model.summary()
+
+        # Prepared for fitting
+        self.model = model
+
+    def conv_lstm(self, print_model_details: bool = False) -> None:
+        model = Sequential([
+            layers.Conv1D(filters = 32, kernel_size = 3, activation = 'relu', input_shape = (self.input[0], self.input[1])), # Convolutional layer
+            layers.LSTM(units = 128),
+            layers.Dropout(0.5), 
+            layers.Dense(units = 64, activation='relu'), 
+            layers.Dense(self.train_y.shape[1], activation = 'softmax')
+        ])
+        
+        if print_model_details:
+            model.summary()
+
+        # Prepared for fitting
+        self.model = model
+
+    def time_conv_lstm(self, print_model_details: bool = False) -> None:
+
+        n_steps, n_length = 5, (self.input[0] // 5)
+        self.train_X = self.train_X.reshape((self.train_X.shape[0], n_steps, n_length, self.input[1]))
+        self.test_X = self.test_X.reshape((self.test_X.shape[0], n_steps, n_length, self.input[1]))
+
+        model = Sequential([
+            layers.TimeDistributed(
+                layers.Conv1D(filters=128, kernel_size=3, activation='relu'), input_shape=(None, n_length, self.input[1])
+            ),
+            layers.TimeDistributed(
+                layers.Conv1D(filters=128, kernel_size=3, activation='relu')
+            ),
+            layers.TimeDistributed(layers.Dropout(0.5)),
+            layers.TimeDistributed(layers.MaxPooling1D(pool_size=2)),
+            layers.TimeDistributed(layers.Flatten()),
+            layers.LSTM(units = 128),
+            layers.Dropout(0.5), 
+            layers.Dense(units = 64, activation='relu'), 
+            layers.Dense(self.train_y.shape[1], activation = 'softmax')
+        ])
+        
+        if print_model_details:
+            model.summary()
+
+        # Prepared for fitting
+        self.model = model
+
+    def gru(self, print_model_details: bool = False) -> None:
+        model = Sequential([
+            layers.GRU(units = 128, input_shape = (self.input[0], self.input[1])), # RNN layer
+            layers.Dropout(0.5), # Dropout layer for regularization
+            layers.Dense(units = 64, activation='relu'), # Hidden dense layer with ReLu
+            layers.Dense(self.train_y.shape[1], activation = 'softmax') # Softmax layer
+        ])
+        
+        if print_model_details:
+            model.summary()
+
+        # Prepared for fitting
+        self.model = model
+        
+    def fit(
+        self, 
+        model: Sequential = None,  
+        epochs: int = 50,
+        batch_size: int = 128,
+        learning_rate: float = 0.002,
+        l2_reg: float = 0.0015,
+    ):
+        if self.model is not None:
+            model = self.model
+        else:
+            raise Exception('No model has been set. Please run a model method first e.g., class.lstm()')
+        
+        train_X, test_X, train_y, test_y = self.train_X, self.test_X, self.train_y, self.test_y 
+        model.compile(
+            optimizer=optimizers.Adam(learning_rate=learning_rate, decay=l2_reg),
+            loss='categorical_crossentropy', 
+            metrics=['accuracy']
+        )
+
+        print("Training model...")
+        history = model.fit(train_X, 
+                            train_y, 
+                            epochs = epochs, 
+                            validation_split = 0.20,
+                            batch_size = batch_size, 
+                            verbose = 1)
+
+        print("Evaluating model...")
+        loss, accuracy = model.evaluate(test_X, 
+                                        test_y, 
+                                        batch_size = batch_size, 
+                                        verbose = 1)
+        
+        print("Test Accuracy :", accuracy)
+        print("Test Loss :", loss)
+
+        return model, history
     
+    def prediction(self, model: Sequential = None,) -> np.ndarray:
+        test_X, test_y = self.test_X, self.test_y
 
-class Chomp1d(nn.Module):
-    def __init__(self, chomp_size):
-        super(Chomp1d, self).__init__()
-        self.chomp_size = chomp_size
+        print("Predicting...")
+        predictions = model.predict(test_X)
 
-    def forward(self, x):
-        return x[:, :, :-self.chomp_size].contiguous()
+        # Get original & predicted classes 
+        max_test = np.argmax(test_y, axis=1)
+        max_pred = np.argmax(predictions, axis=1)
 
+        return confusion_matrix(max_test, max_pred)
 
-class TemporalBlock(nn.Module):
-    def __init__(self, n_inputs, n_outputs, kernel_size, stride, dilation, padding, dropout=0.2):
-        super(TemporalBlock, self).__init__()
-        self.conv1 = weight_norm(nn.Conv1d(n_inputs, n_outputs, kernel_size,
-                                           stride=stride, padding=padding, dilation=dilation))
-        self.chomp1 = Chomp1d(padding)
-        self.relu1 = nn.ReLU()
-        self.dropout1 = nn.Dropout(dropout)
+    def fit_predict(
+        self,
+        model: str = "lstm",
+        epochs: int = 50,
+        batch_size: int = 128,
+        learning_rate: float = 0.002,
+        l2_reg: float = 0.0015,
+        print_model_details: bool = False,
+    ):
+        if model == "lstm":
+            self.lstm(print_model_details=print_model_details)
+        elif model == "conv_lstm":
+            self.conv_lstm(print_model_details=print_model_details)
+        elif model == "time_conv_lstm":
+            self.time_conv_lstm(print_model_details=print_model_details)
+        elif model == "gru":
+            self.gru(print_model_details=print_model_details)
+        else:
+            raise Exception('Model not recognised. Please use one of the following: lstm, conv_lstm, time_conv_lstm, gru')
+        
+        model, history = self.fit(
+            epochs = epochs,
+            batch_size = batch_size,
+            learning_rate = learning_rate,
+            l2_reg = l2_reg
+        )
 
-        self.conv2 = weight_norm(nn.Conv1d(n_outputs, n_outputs, kernel_size,
-                                           stride=stride, padding=padding, dilation=dilation))
-        self.chomp2 = Chomp1d(padding)
-        self.relu2 = nn.ReLU()
-        self.dropout2 = nn.Dropout(dropout)
+        results = self.prediction(model)
 
-        self.net = nn.Sequential(self.conv1, self.chomp1, self.relu1, self.dropout1,
-                                 self.conv2, self.chomp2, self.relu2, self.dropout2)
-        self.downsample = nn.Conv1d(n_inputs, n_outputs, 1) if n_inputs != n_outputs else None
-        self.relu = nn.ReLU()
-        self.init_weights()
-
-    def init_weights(self):
-        self.conv1.weight.data.normal_(0, 0.01)
-        self.conv2.weight.data.normal_(0, 0.01)
-        if self.downsample is not None:
-            self.downsample.weight.data.normal_(0, 0.01)
-
-    def forward(self, x):
-        out = self.net(x)
-        res = x if self.downsample is None else self.downsample(x)
-        return self.relu(out + res)
-
-
-class TemporalConvNet(nn.Module):
-    def __init__(self, num_inputs, num_channels, kernel_size=2, dropout=0.2):
-        super(TemporalConvNet, self).__init__()
-        layers = []
-        num_levels = len(num_channels)
-        for i in range(num_levels):
-            dilation_size = 2 ** i
-            in_channels = num_inputs if i == 0 else num_channels[i-1]
-            out_channels = num_channels[i]
-            layers += [TemporalBlock(in_channels, out_channels, kernel_size, stride=1, dilation=dilation_size,
-                                     padding=(kernel_size-1) * dilation_size, dropout=dropout)]
-
-        self.network = nn.Sequential(*layers)
-
-    def forward(self, x):
-        return self.network(x)
-
-
-class TemporalClassification(nn.Module):
-    def __init__(self, input_size, output_size, num_channels, kernel_size, dropout):
-        super(TemporalClassification, self).__init__()
-        self.tcn = TemporalConvNet(input_size, num_channels, kernel_size=kernel_size, dropout=dropout)
-        self.linear = nn.Linear(num_channels[-1], output_size)
-
-    def forward(self, inputs):
-        y1 = self.tcn(inputs)  
-        o = self.linear(y1[:, :, -1])
-        return F.log_softmax(o, dim=1)
-    
-
-
+        return model, history, results

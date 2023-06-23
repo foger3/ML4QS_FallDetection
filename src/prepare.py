@@ -4,8 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sn
 from sklearn import metrics
 from sklearn.model_selection import train_test_split
-import torch
-from torch.utils.data import Dataset
+from scipy import stats
 
 # This class creates dfs splits that can be used by classification learning algorithms.
 class ClassificationPrepareData:
@@ -91,6 +90,7 @@ class ClassificationPrepareData:
             training_set_y = df.iloc[0:end_training_set, class_label_indices]
             test_set_X = df.iloc[end_training_set:len(df.index), features]
             test_set_y = df.iloc[end_training_set:len(df.index), class_label_indices]
+        
         # For non temporal data we use a standard function to randomly split the df.
         else:
             df_head = df.drop_duplicates("ID", ignore_index=True)
@@ -119,6 +119,67 @@ class ClassificationPrepareData:
         print('Test set length is: ', len(test_set_X.index))
         
         return training_set_X, test_set_X, training_set_y, test_set_y
+    
+    def data_reshape(
+        self,
+        df: pd.DataFrame, 
+        class_labels: list[str],  
+        step: int = 5,
+        time_intervals: int = 50,          
+    ):
+        sensor_labels = [col for col in df.columns if col not in class_labels]
+        # Create a single class column to extract mode
+        df[self.class_col] = df[class_labels].idxmax(axis=1)
+        df[self.class_col] = pd.factorize(df[self.class_col], sort=True)[0]
+
+        # Reshape input for neural network in to [samples, time_intervals, features]
+        segments = []
+        labels = []
+        for i in range(0,  df.shape[0]- time_intervals, step):  
+            feat_temp = []
+            for feature in sensor_labels:
+                xs = df[feature].values[i: i + time_intervals]
+                feat_temp.append(xs)
+            label = stats.mode(df[self.class_col][i: i + time_intervals], keepdims=True)[0][0]
+
+            segments.append(feat_temp)
+            labels.append(label)
+
+        reshaped_segments = np.asarray(
+            segments, dtype= np.float32
+        ).reshape(-1, time_intervals, len(sensor_labels))
+        labels = np.asarray(pd.get_dummies(labels), dtype = np.float32)
+
+        return reshaped_segments, labels
+        
+    def split_classification_nn(
+        self,
+        df: pd.DataFrame, 
+        class_labels: list[str],  
+        step: int = 5,
+        time_intervals: int = 50,
+        training_frac: float = 0.7, 
+        filter: bool = True,  
+        random_state: int = 0
+    ):
+        # desirable to drop NAs and those with multiple classes
+        if filter: 
+            df = df.dropna()
+            df = df[df[class_labels].sum(axis=1) < 2]
+
+        reshaped_x, reshaped_y = self.data_reshape(df, class_labels, step, time_intervals)
+
+        # Only option for recurrent neural network to split temporally
+        X_train, X_test, y_train, y_test = train_test_split(
+                                                        reshaped_x, 
+                                                        reshaped_y, 
+                                                        test_size = (1- training_frac), 
+                                                        shuffle=False, 
+                                                        random_state = random_state
+                                                    )
+        
+        return X_train, X_test, y_train, y_test
+
 
 # Class for evaluation metrics of classification problems.
 class ClassificationEvaluation:
@@ -155,58 +216,3 @@ class ClassificationEvaluation:
         sn.set(font_scale=1)
         sn.heatmap(df_cm, cmap="crest", annot=True, annot_kws={"size": 10})
         plt.savefig(f"{filepath}")
-
-
-class TCNDataset(Dataset):
-    def __init__(self,
-        df: pd.DataFrame = None,
-        class_columns: list[str] = None,
-        split: str = "train",
-    ):
-
-        if split == "train":
-            X, y, _, _ = self.data_split(df, class_columns)
-        elif split == "test":
-            _, _, X, y = self.data_split(df, class_columns)
-        else:
-            raise ValueError("split must be either 'train' or 'test'")
-        
-        self.X = torch.tensor(X.values, dtype=torch.float32)
-        self.y = torch.tensor(y.values).squeeze()
-
-    def __len__(self):
-        return len(self.X)
-
-    def __getitem__(self, idx):
-        return self.X[idx], self.y[idx]
-    
-    def data_split(
-        self,
-        df: pd.DataFrame = None, 
-        class_columns: list[str] = None, 
-        filter: bool = True,
-        not_hot: bool = True,
-        train_frac: float = 0.7
-    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        
-        if filter:
-            df = df.dropna()
-            df = df[df[class_columns].sum(axis=1) < 2]
-            
-        if not_hot:
-            df["class"] = df[class_columns].idxmax(axis=1)
-            df["class"] = pd.factorize(df["class"], sort=True)[0]
-            
-            df = df.drop(class_columns, axis=1)
-            class_columns = "class"
-
-        features = [df.columns.get_loc(x) for x in df.columns if x not in class_columns]
-        class_label_indices = [df.columns.get_loc(x) for x in df.columns if x in class_columns]
-
-        end_training_set = int(train_frac * len(df.index))
-        training_set_X = df.iloc[0:end_training_set, features]
-        training_set_y = df.iloc[0:end_training_set, class_label_indices]
-        test_set_X = df.iloc[end_training_set:len(df.index), features]
-        test_set_y = df.iloc[end_training_set:len(df.index), class_label_indices]
-
-        return training_set_X, training_set_y, test_set_X, test_set_y
