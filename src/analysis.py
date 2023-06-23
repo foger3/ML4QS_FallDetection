@@ -1,6 +1,6 @@
 import copy
 import pandas as pd
-
+import numpy as np
 from descriptives import describe
 from outlier_detection import OutlierDetectionDistribution
 from data_transformation import DataTransformation
@@ -36,14 +36,16 @@ df = df[["ID"] + sensor_columns + label_columns]
 outlier = OutlierDetectionDistribution(df, sensor_columns)
 chauvenet_df = outlier.chauvenet(C=10)
 # outlier.chauvenet_visualize(chauvenet_df)
-mixture_df = outlier.mixture_model(n_components=3)
+# chauvenet_df.columns = sensor_columns
+# df.loc[:,sensor_columns] = df.loc[:,sensor_columns].where(~chauvenet_df)
+# mixture_df = outlier.mixture_model(n_components=3)
 
 ## Missing & General Data Transformation
 transform = DataTransformation(df, sensor_columns)
 df = transform.impute_interpolate(df, sensor_columns)
 
 granularity = 10
-df = transform.low_pass_filter(df, sensor_columns, sampling_frequency=(1000 / granularity), cutoff_frequency=1.5)
+# df = transform.low_pass_filter(df, sensor_columns, sampling_frequency=(1000 / granularity), cutoff_frequency=1.5)
 # transform.low_pass_filter_visualize(df, label_columns)
 
 ### Feature Engineering ###
@@ -117,7 +119,6 @@ selected_features = ['Accelerometer Y (m/s^2)_temp_min_ws_500',
                      'Magnetometer X (µT)_freq_41.6_Hz_ws_500', 
                      'Accelerometer Z (m/s^2)_freq_36.0_Hz_ws_500']
 
-
 ### Non-temporal Predictive Modelling ###
 class_pro = NonTemporalClassification(
     final_df, label_columns, matching, temporal, selected_features
@@ -127,8 +128,10 @@ class_eval = ClassificationEvaluation()
 performance_tr_nn, performance_te_nn = 0, 0
 performance_tr_rf, performance_te_rf = 0, 0
 performance_tr_svm, performance_te_svm = 0, 0
+cm_te_rf = np.zeros((len(label_columns), len(label_columns)))
+cm_te_svm = np.zeros((len(label_columns), len(label_columns)))
 
-n_cv_rep = 1
+n_cv_rep = 5
 for repeat in range(n_cv_rep):
     print("Training RandomForest run {} / {} ... ".format(repeat, n_cv_rep))
     (
@@ -140,18 +143,23 @@ for repeat in range(n_cv_rep):
 
     performance_tr_rf += class_eval.accuracy(class_pro.train_y, class_train_y)
     performance_te_rf += class_eval.accuracy(class_pro.test_y, class_test_y)
+    cm = class_eval.confusion_matrix(class_pro.test_y, class_test_y, class_train_prob_y.columns)
+    cm_te_rf += cm
 
-    print("Training SVM run {} / {} ... ".format(repeat, n_cv_rep))
-    (
-        class_train_y,
-        class_test_y,
-        class_train_prob_y,
-        class_test_prob_y,
-    ) = class_pro.support_vector_machine(gridsearch=True)
+    # print("Training SVM run {} / {} ... ".format(repeat, n_cv_rep))
+    # (
+    #     class_train_y,
+    #     class_test_y,
+    #     class_train_prob_y,
+    #     class_test_prob_y,
+    # ) = class_pro.support_vector_machine(gridsearch=True)
 
-    performance_tr_svm += class_eval.accuracy(class_pro.train_y, class_train_y)
-    performance_te_svm += class_eval.accuracy(class_pro.test_y, class_test_y)
+    # performance_tr_svm += class_eval.accuracy(class_pro.train_y, class_train_y)
+    # performance_te_svm += class_eval.accuracy(class_pro.test_y, class_test_y)
+    # cm = class_eval.confusion_matrix(class_pro.test_y, class_test_y, class_train_prob_y.columns)
+    # cm_te_svm += cm
 
-cm = class_eval.confusion_matrix(class_pro.test_y, class_test_y, class_train_prob_y.columns)
-class_eval.confusion_matrix_visualize(cm, [col.split(" ")[1] for col in class_train_prob_y.columns], "./cm_rf.png")
+print("RandomForest train accurancy ({} times average) : {}".format(n_cv_rep, performance_tr_rf/n_cv_rep))
+print("RandomForest test accurancy ({} times average) : {}".format(n_cv_rep, performance_te_rf/n_cv_rep))
+class_eval.confusion_matrix_visualize(cm_te_rf/n_cv_rep, [col.split(" ")[1] for col in class_train_prob_y.columns], "./cm_rf.png")
 
