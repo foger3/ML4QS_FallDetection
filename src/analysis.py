@@ -39,17 +39,20 @@ df = df[sensor_columns + label_columns]
 ### Noise Handling ###
 ## Outlier Analysis
 outlier = OutlierDetectionDistribution(df, sensor_columns)
-chauvenet_df = outlier.chauvenet(C=10)
+# chauvenet_df = outlier.chauvenet(C=10)
 # outlier.chauvenet_visualize(chauvenet_df)
 # chauvenet_df.columns = sensor_columns
 # df.loc[:,sensor_columns] = df.loc[:,sensor_columns].where(~chauvenet_df)
-# mixture_df = outlier.mixture_model(n_components=3)
+mixture_df = outlier.mixture_model(n_components=2)
+mixture_df.columns = sensor_columns
+df.loc[:,sensor_columns] = df.loc[:,sensor_columns].where(mixture_df >= 1e-60)
+# print(df[df.isna().any(axis=1)].sum()[label_columns])
 
 ## Missing & General Data Transformation
 transform = DataTransformation(df, sensor_columns)
 df = transform.impute_interpolate(df, sensor_columns)
 
-granularity = 10
+# granularity = 10
 # df = transform.low_pass_filter(df, sensor_columns, sampling_frequency=(1000 / granularity), cutoff_frequency=1.5)
 # transform.low_pass_filter_visualize(df, label_columns)
 
