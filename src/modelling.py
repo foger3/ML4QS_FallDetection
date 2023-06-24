@@ -1,6 +1,9 @@
 import copy
 import numpy as np 
 import pandas as pd
+import seaborn as sn
+import matplotlib.pyplot as plt
+from sklearn import metrics
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
@@ -9,7 +12,44 @@ from sklearn.metrics import confusion_matrix
 from keras.models import Sequential
 from keras import layers, optimizers
 
-from prepare import ClassificationPrepareData, ClassificationEvaluation
+from prepare import ClassificationPrepareData
+
+
+# Class for evaluation metrics of classification problems.
+class ClassificationEvaluation:
+
+    @staticmethod
+    def accuracy(y_true, y_pred):
+        return metrics.accuracy_score(y_true, y_pred)
+
+    @staticmethod
+    def precision(y_true, y_pred):
+        return metrics.precision_score(y_true, y_pred, average=None)
+
+    @staticmethod
+    def recall(y_true, y_pred):
+        return metrics.recall_score(y_true, y_pred, average=None)
+
+    @staticmethod
+    def f1(y_true, y_pred):
+        return metrics.f1_score(y_true, y_pred, average=None)
+
+    @staticmethod
+    def auc(y_true, y_pred_prob):
+        return metrics.roc_auc_score(y_true, y_pred_prob)
+
+    @staticmethod
+    def confusion_matrix(y_true, y_pred, labels):
+        return metrics.confusion_matrix(y_true, y_pred, labels=labels)
+
+    @staticmethod
+    def confusion_matrix_visualize(cm, labels, filepath):
+        cm = cm / np.expand_dims(np.sum(cm, axis = 1), axis = 1)
+        df_cm = pd.DataFrame(cm, index = labels, columns = labels)
+        plt.figure(figsize = (9,5))
+        sn.set(font_scale=1)
+        sn.heatmap(df_cm, cmap="crest", annot=True, annot_kws={"size": 10})
+        plt.savefig(f"{filepath}")
 
 
 # Class features the most popular and best-performing classification algorithms.
@@ -215,10 +255,10 @@ class TemporalClassification:
         
     def lstm(self, print_model_details: bool = False) -> None:
         model = Sequential([
-            layers.LSTM(units = 128, input_shape = (self.input[0], self.input[1])), # RNN layer
+            layers.LSTM(units=128, input_shape=(self.input[0], self.input[1])), # RNN layer
             layers.Dropout(0.5), # Dropout layer for regularization
-            layers.Dense(units = 64, activation='relu'), # Hidden dense layer with ReLu
-            layers.Dense(self.train_y.shape[1], activation = 'softmax') # Softmax layer
+            layers.Dense(units=64, activation='relu'), # Hidden dense layer with ReLu
+            layers.Dense(self.train_y.shape[1], activation='softmax') # Softmax layer
         ])
         
         if print_model_details:
@@ -229,11 +269,11 @@ class TemporalClassification:
 
     def conv_lstm(self, print_model_details: bool = False) -> None:
         model = Sequential([
-            layers.Conv1D(filters = 32, kernel_size = 3, activation = 'relu', input_shape = (self.input[0], self.input[1])), # Convolutional layer
-            layers.LSTM(units = 128),
+            layers.Conv1D(filters=128, kernel_size=3, activation='relu', input_shape=(self.input[0], self.input[1])), # Convolutional layer
+            layers.LSTM(units=128),
             layers.Dropout(0.5), 
-            layers.Dense(units = 64, activation='relu'), 
-            layers.Dense(self.train_y.shape[1], activation = 'softmax')
+            layers.Dense(units=64, activation='relu'), 
+            layers.Dense(self.train_y.shape[1], activation='softmax')
         ])
         
         if print_model_details:
@@ -250,18 +290,18 @@ class TemporalClassification:
 
         model = Sequential([
             layers.TimeDistributed(
-                layers.Conv1D(filters=128, kernel_size=3, activation='relu'), input_shape=(None, n_length, self.input[1])
+                layers.Conv1D(filters=32, kernel_size=3, activation='relu'), input_shape=(None, n_length, self.input[1])
             ),
             layers.TimeDistributed(
-                layers.Conv1D(filters=128, kernel_size=3, activation='relu')
+                layers.Conv1D(filters=32, kernel_size=3, activation='relu')
             ),
             layers.TimeDistributed(layers.Dropout(0.5)),
             layers.TimeDistributed(layers.MaxPooling1D(pool_size=2)),
             layers.TimeDistributed(layers.Flatten()),
-            layers.LSTM(units = 128),
+            layers.LSTM(units=128),
             layers.Dropout(0.5), 
-            layers.Dense(units = 64, activation='relu'), 
-            layers.Dense(self.train_y.shape[1], activation = 'softmax')
+            layers.Dense(units=64, activation='relu'), 
+            layers.Dense(self.train_y.shape[1], activation='softmax')
         ])
         
         if print_model_details:
@@ -272,10 +312,10 @@ class TemporalClassification:
 
     def gru(self, print_model_details: bool = False) -> None:
         model = Sequential([
-            layers.GRU(units = 128, input_shape = (self.input[0], self.input[1])), # RNN layer
+            layers.GRU(units=128, input_shape=(self.input[0], self.input[1])), # RNN layer
             layers.Dropout(0.5), # Dropout layer for regularization
-            layers.Dense(units = 64, activation='relu'), # Hidden dense layer with ReLu
-            layers.Dense(self.train_y.shape[1], activation = 'softmax') # Softmax layer
+            layers.Dense(units=64, activation='relu'), # Hidden dense layer with ReLu
+            layers.Dense(self.train_y.shape[1], activation='softmax') # Softmax layer
         ])
         
         if print_model_details:
