@@ -118,7 +118,8 @@ class_feature = NonTemporalClassification( # prepare class
 selected_features, _, _ = class_feature.forward_selection(max_features=30)
 
 # Selected features with OR without outlier & missing data handling
-selected_features = selected_features_outlier if True else selected_features_no_outlier
+selected_features = selected_features_outlier.copy() if True \
+      else selected_features_no_outlier.copy()
 
 
 
@@ -180,8 +181,8 @@ class_eval.confusion_matrix_visualize(
 
 ## Two versions of the data were tested
 # 1. The original raw data
-df = pd.read_csv("../dataset/data_cleaned.csv")
-df = df[sensor_columns + label_columns]
+# df = pd.read_csv("../dataset/data_cleaned.csv")
+# df = df[sensor_columns + label_columns]
 
 # 2. The data with features extracted (temporal & frequency domain, but not PCA)
 df = pd.read_pickle("c:\\Users\\lucat\\OneDrive\\Documents\\Uni Amsterdam\\ml4qs_full_df.pkl")
@@ -190,16 +191,16 @@ df = df[selected_features + label_columns]
 
 # Fitting Procedure
 class_nn = TemporalClassification(
-                            df, 
-                            label_columns, 
-                            step=10, # controls overlap (fraction of time_interval)
-                            time_intervals=int(float(1000) / milliseconds_per_instance)
-                        )
+    df, 
+    label_columns, 
+    step=10, # controls overlap (fraction of time_interval)
+    time_intervals=int(float(1000) / milliseconds_per_instance)
+)
 
 # Manual Fitting Example
-class_nn.conv_lstm(print_model_details=False)
-model, hist = class_nn.fit(epochs=10, batch_size=128)
-result = class_nn.prediction(model)
+# class_nn.conv_lstm(print_model_details=False)
+# model, hist = class_nn.fit(epochs=10, batch_size=128)
+# result = class_nn.prediction(model)
 
 # Automatic Fitting (above can be skipped, only when individual components are investigated)
 _, _, result = class_nn.fit_predict(model="conv_lstm", epochs=10, batch_size=128)
