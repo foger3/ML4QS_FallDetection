@@ -341,7 +341,7 @@ class TemporalClassification:
         
         train_X, test_X, train_y, test_y = self.train_X, self.test_X, self.train_y, self.test_y 
         model.compile(
-            optimizer=optimizers.Adam(learning_rate=learning_rate, decay=l2_reg),
+            optimizer=optimizers.legacy.Adam(learning_rate=learning_rate, decay=l2_reg),
             loss='categorical_crossentropy', 
             metrics=['accuracy']
         )
