@@ -1,10 +1,12 @@
 from glob import glob
+from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
+
 from miscellaneous import label_map, label_categories
-from datetime import datetime, timedelta
+
 
 def load_dataset_map(
     filepath: str,
@@ -148,6 +150,7 @@ def adjust_granularity_timestamp_timediff(
 
     return df
 
+
 def fill_missing_value(
     df: pd.DataFrame
 ) -> pd.DataFrame:
@@ -178,6 +181,7 @@ def fill_missing_value(
     
     return df
 
+
 def assign_id_per_movement(
     df: pd.DataFrame, based: int
 ) -> pd.DataFrame:
@@ -187,6 +191,7 @@ def assign_id_per_movement(
         df.loc[movement_start_idx[i]:movement_start_idx[i+1], "ID"] = i
 
     return df
+
 
 filepath = "/Users/thl/Downloads/"
 round_num = 3

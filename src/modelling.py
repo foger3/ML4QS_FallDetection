@@ -147,6 +147,7 @@ class NonTemporalClassification:
         if gridsearch:
             rf = rf.best_estimator_
 
+        # Apply the model
         pred_prob_training_y = rf.predict_proba(train_X)
         pred_prob_test_y = rf.predict_proba(test_X)
         pred_training_y = rf.predict(train_X)
@@ -284,6 +285,7 @@ class TemporalClassification:
 
     def time_conv_lstm(self, print_model_details: bool = False) -> None:
 
+        # Reshape into smaller time segments for time distribution
         n_steps, n_length = 5, (self.input[0] // 5)
         self.train_X = self.train_X.reshape((self.train_X.shape[0], n_steps, n_length, self.input[1]))
         self.test_X = self.test_X.reshape((self.test_X.shape[0], n_steps, n_length, self.input[1]))

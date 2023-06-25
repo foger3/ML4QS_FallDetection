@@ -70,7 +70,6 @@ class FeatureAbstraction:
     # Here, the sampling rate expresses the number of samples per second (i.e. Frequency is Hertz of the dataset).
     def find_fft_transformation(self, data: pd.Series):
         # Create the transformation, this includes the amplitudes of both the real and imaginary part.
-        # print(data.shape)
         transformation = np.fft.rfft(data, len(data))
         # real
         real_ampl = transformation.real
@@ -78,9 +77,7 @@ class FeatureAbstraction:
         max_freq = self.freqs[np.argmax(real_ampl[0 : len(real_ampl)])]
         # weigthed
         freq_weigthed = float(np.sum(self.freqs * real_ampl)) / np.sum(real_ampl)
-
         # pse
-
         PSD = np.divide(np.square(real_ampl), float(len(real_ampl)))
         PSD_pdf = np.divide(PSD, np.sum(PSD))
 
@@ -115,10 +112,6 @@ class FeatureAbstraction:
             ]
 
             # rolling statistics to calculate frequencies, per window size.
-            # Pandas Rolling method can only return one aggregation value.
-            # Therefore values are not returned but stored in temp class variable 'temp_list'.
-
-            # note to self! Rolling window_size would be nicer and more logical! In older version windowsize is actually 41. (ws + 1)
             df[col].rolling(self.ws + 1).apply(self.find_fft_transformation)
 
             # Pad the missing rows with nans
@@ -128,8 +121,8 @@ class FeatureAbstraction:
                 "constant",
                 constant_values=np.nan,
             )
+            
             # add new freq columns to frame
-
             frequencies = pd.DataFrame(frequencies, index=df.index, columns=collist)
             df = pd.concat([df, frequencies], axis=1)
 

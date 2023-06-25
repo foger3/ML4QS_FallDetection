@@ -22,10 +22,9 @@ class OutlierDetectionDistribution:
     # the same name extended with '_outlier' that expresses the result per data point.
     def chauvenet(self, C: int = 2) -> pd.DataFrame:
         # Taken partly from: https://www.astro.rug.nl/software/kapteyn/
-
         chauvenet_df = pd.DataFrame()
         for col in self.columns:
-            # Computer the mean and standard deviation.
+            # Compute the mean and standard deviation.
             mean = self.df[col].mean()
             std = self.df[col].std()
             N = len(self.df.index)
@@ -50,11 +49,10 @@ class OutlierDetectionDistribution:
 
         return chauvenet_df
 
-    # Fits a mixture model towards the data expressed in col and adds a column with the probability
-    # of observing the value given the mixture model.
+    # Fits a mixture model towards the data expressed in col and adds a column with 
+    # the probability of observing the value given the mixture model.
     def mixture_model(self, n_components: int = 3) -> pd.DataFrame:
         # Fit a mixture model to our data.
-
         mixture_df = pd.DataFrame()
         for col in self.columns:
             data = self.df[self.df[col].notnull()][col]

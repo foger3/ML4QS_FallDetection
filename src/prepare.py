@@ -63,8 +63,7 @@ class ClassificationPrepareData:
                 test_size = (1- training_frac), 
                 shuffle=False
             )
-
-        # For non temporal data we use a standard function to randomly split the df.
+        # For non temporal data we randomly split the df.
         else:
             df_head = df.drop_duplicates("ID", ignore_index=True)
             training_set_X, test_set_X, training_set_y, test_set_y = train_test_split(
@@ -93,6 +92,7 @@ class ClassificationPrepareData:
         
         return training_set_X, test_set_X, training_set_y, test_set_y
     
+    # Reshape data for input of neural network
     def data_reshape(
         self,
         df: pd.DataFrame, 
@@ -142,7 +142,7 @@ class ClassificationPrepareData:
 
         reshaped_x, reshaped_y = self.data_reshape(df, class_labels, step, time_intervals)
 
-        # Only option for recurrent neural network to split temporally
+        # Only option for recurrent neural networks to split temporally
         X_train, X_test, y_train, y_test = train_test_split(
             reshaped_x, 
             reshaped_y, 
