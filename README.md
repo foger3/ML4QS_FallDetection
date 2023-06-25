@@ -1,4 +1,4 @@
-# ML4QS_FallDetection
+# [ML4QS_FallDetection](https://github.com/foger3/ML4QS_FallDetection)
 
 This project aim to distinguish the falling from the non-falling motion by using appropriate preprocessing steps and state-of-the-art machine learning techniques.
 
