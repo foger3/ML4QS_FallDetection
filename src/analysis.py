@@ -49,7 +49,10 @@ def generate_final_dataset(
         df.loc[:, sensor_columns] = df.loc[:, sensor_columns].where(mixture_df >= 1e-60)
 
         ## How many missing values do we have now?
-        logger.info(df[df.isna().any(axis=1)].sum()[label_columns])
+        logger.info(f"The number of outlier: {int(df[df.isna().any(axis=1)].sum()[label_columns].sum())}")
+        df_tmp = df[df.isna().any(axis=1)].sum()
+        for i in label_columns:
+            print("\t- The number of {:<14}:{:>3}".format(i, int(df_tmp[i])))
 
         ## Missing Data: As we threw out some data, we have to impute the missing values
         transform = DataTransformation(df, sensor_columns)  # prepare class
