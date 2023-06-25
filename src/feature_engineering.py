@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 from sklearn.decomposition import PCA
+from miscellaneous import logger
 
 
 class FeatureAbstraction:
@@ -121,7 +122,7 @@ class FeatureAbstraction:
                 "constant",
                 constant_values=np.nan,
             )
-            
+
             # add new freq columns to frame
             frequencies = pd.DataFrame(frequencies, index=df.index, columns=collist)
             df = pd.concat([df, frequencies], axis=1)
@@ -134,7 +135,7 @@ class FeatureAbstraction:
     def abstract_features_with_pca(
         self, df: pd.DataFrame, label_columns: list[str], n_components: int = 20
     ) -> pd.DataFrame:
-        
+
         # Interpolate missing values as PCA cannot handle these
         df_copy = copy.deepcopy(df).interpolate().ffill().bfill()
 
@@ -148,8 +149,9 @@ class FeatureAbstraction:
         X_pca = pca.fit_transform(X_normalized)
 
         # How much variance can we explain this way
-        print("{} components capture {} (%) of the feature's variance"
-              .format(n_components, pca.explained_variance_ratio_.sum().round(3)))
+        logger.info(
+            f"{n_components} components capture {pca.explained_variance_ratio_.sum().round(3)} (%) of the feature's variance"
+        )
 
         # Add PCA components to dataframe
         collist = [f"PCA_Component_{i}" for i in range(n_components)]

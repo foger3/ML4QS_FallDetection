@@ -1,4 +1,5 @@
 import pandas as pd
+from miscellaneous import logger
 
 def describe(
     df: pd.DataFrame
@@ -9,10 +10,10 @@ def describe(
     df_start = df.loc[movement_start_idx]
     movement_cnts = []
 
-    print(f"The number of movement: {movement_num}")
+    logger.info(f"The number of movement: {movement_num}")
     for name in label_names:
         movement_cnt = df_start[df_start[name] == 1].shape[0]
-        print("  - The number of {:<14}:{:>3}".format(name, movement_cnt))
+        print("\t- The number of {:<14}:{:>3}".format(name, movement_cnt))
         movement_cnts.append(movement_cnt)
     des_df = pd.DataFrame([movement_num] + movement_cnts, columns = ["count"], index = ["Total"] + list(label_names))
     

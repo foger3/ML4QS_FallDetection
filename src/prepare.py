@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from scipy import stats
+from miscellaneous import logger
 
 # This class creates dfs splits that can be used by classification learning algorithms.
 class ClassificationPrepareData:
@@ -87,8 +88,8 @@ class ClassificationPrepareData:
         for df_i in [training_set_X, test_set_X]:
             df_i = df_i.drop(["ID"], axis=1, inplace=True)
 
-        print('Training set length is: ', len(training_set_X.index))
-        print('Test set length is: ', len(test_set_X.index))
+        logger.info(f"Training set length is: {len(training_set_X.index)}")
+        logger.info(f"Test set length is: {len(test_set_X.index)}")
         
         return training_set_X, test_set_X, training_set_y, test_set_y
     
