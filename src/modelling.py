@@ -13,7 +13,7 @@ from keras.models import Sequential
 from keras import layers, optimizers
 
 from prepare import ClassificationPrepareData
-
+from miscellaneous import logger
 
 # Class for evaluation metrics of classification problems.
 class ClassificationEvaluation:
@@ -100,7 +100,7 @@ class NonTemporalClassification:
         svm.fit(train_X, train_y.values.ravel())
 
         if gridsearch and print_model_details:
-            print(svm.best_params_)
+            logger.info(svm.best_params_)
 
         if gridsearch:
             svm = svm.best_estimator_
@@ -142,7 +142,7 @@ class NonTemporalClassification:
         rf.fit(train_X, train_y.values.ravel())
 
         if gridsearch and print_model_details:
-            print(rf.best_params_)
+            logger.info(rf.best_params_)
 
         if gridsearch:
             rf = rf.best_estimator_
@@ -157,7 +157,7 @@ class NonTemporalClassification:
 
         if print_model_details:
             ordered_indices = [i[0] for i in sorted(enumerate(rf.feature_importances_), key=lambda x:x[1], reverse=True)]
-            print('Feature importance random forest:')
+            logger.info('Feature importance random forest:')
             for i in range(0, len(rf.feature_importances_)):
                 print(train_X.columns[ordered_indices[i]], end='')
                 print(' & ', end='')
@@ -201,7 +201,7 @@ class NonTemporalClassification:
             features_left = list(set(train_X.columns) - set(selected_features))
             best_perf = 0
 
-            print("Added feature {}".format(i))
+            logger.info(f"Added feature {i}")
             # For all features we can still select...
             for f in features_left:
                 temp_selected_features = copy.deepcopy(selected_features)
@@ -224,9 +224,9 @@ class NonTemporalClassification:
             ordered_features.append(best_feature)
             ordered_scores.append(best_perf)
 
-        print("The {} most important features, in order:".format(max_features))
+        logger.info(f"The {max_features} most important features, in order:")
         for name in ordered_features:
-            print("  - {}".format(name))
+            print("\t- {}".format(name))
 
         return selected_features, ordered_features, ordered_scores
 
@@ -346,7 +346,7 @@ class TemporalClassification:
             metrics=['accuracy']
         )
 
-        print("Training model...")
+        logger.info("Training model...")
         history = model.fit(train_X, 
                             train_y, 
                             epochs = epochs, 
@@ -354,21 +354,21 @@ class TemporalClassification:
                             batch_size = batch_size, 
                             verbose = 1)
 
-        print("Evaluating model...")
+        logger.info("Evaluating model...")
         loss, accuracy = model.evaluate(test_X, 
                                         test_y, 
                                         batch_size = batch_size, 
                                         verbose = 1)
         
-        print("Test Accuracy :", accuracy)
-        print("Test Loss :", loss)
+        logger.info(f"Test Accuracy : {accuracy}")
+        logger.info(f"Test Loss : {loss}")
 
         return model, history
     
     def prediction(self, model: Sequential = None,) -> np.ndarray:
         test_X, test_y = self.test_X, self.test_y
 
-        print("Predicting...")
+        logger.info("Predicting...")
         predictions = model.predict(test_X)
 
         # Get original & predicted classes 

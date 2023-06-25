@@ -1,34 +1,28 @@
 import copy
+import os
 import pandas as pd
 import numpy as np
-
 from descriptives import describe
 from outlier_detection import OutlierDetectionDistribution
 from data_transformation import DataTransformation
 from feature_engineering import FeatureAbstraction
-from miscellaneous import selected_features_outlier, selected_features_no_outlier
+from miscellaneous import selected_features_outlier, selected_features_no_outlier, label_columns
 from modelling import (
     NonTemporalClassification,
     TemporalClassification,
     ClassificationEvaluation,
 )
-
+from miscellaneous import logger
 
 def generate_final_dataset(
-    matching: str, temporal_split: bool, filter_outlier: bool, for_temporal_model: bool
-) -> tuple[pd.DataFrame, list[str], list[str], float]:
+    granularity: int, matching: str, temporal_split: bool, filter_outlier: bool, filter_lowpass: bool, for_temporal_model: bool
+) -> tuple[pd.DataFrame, list[str]]:
     ### Read in cleaned data and defined reoccruing objects ###
-    df = pd.read_csv("../dataset/data_cleaned.csv")
+    df = pd.read_csv(f"../dataset/data_cleaned_{granularity}.csv")
     sensor_columns = [  # Save the individual sensor columns
         col for col in df.columns[3:16] if "Linear" not in col
     ]
-    label_columns = sorted(  # Save the invdividual label columns
-        [col for col in df.columns[16:]]
-    )
-    milliseconds_per_instance = (  # Compute number of milliseconds covered by an instance
-        df.loc[1, "Time difference (s)"] * 1000
-    )
-
+    milliseconds_per_instance = granularity
     ### Descriptive Analysis ###
 
     ## Let's have a look at the data (descriptive statistics)
@@ -55,18 +49,18 @@ def generate_final_dataset(
         df.loc[:, sensor_columns] = df.loc[:, sensor_columns].where(mixture_df >= 1e-60)
 
         ## How many missing values do we have now?
-        print(df[df.isna().any(axis=1)].sum()[label_columns])
+        logger.info(df[df.isna().any(axis=1)].sum()[label_columns])
 
         ## Missing Data: As we threw out some data, we have to impute the missing values
         transform = DataTransformation(df, sensor_columns)  # prepare class
         df = transform.impute_interpolate(df, sensor_columns)
 
     ## Transform the data: Use if applicable
-    # granularity = 10
-    # df = transform.low_pass_filter(
-    #     df, sensor_columns, sampling_frequency=(1000 / granularity), cutoff_frequency=5
-    # )
-    # transform.low_pass_filter_visualize(df, label_columns)
+    if filter_lowpass:
+        df = transform.low_pass_filter(
+            df, sensor_columns, sampling_frequency=(1000 / granularity), cutoff_frequency=5
+        )
+        # transform.low_pass_filter_visualize(df, label_columns)
 
     ### Feature Engineering ###
 
@@ -132,17 +126,16 @@ def generate_final_dataset(
     else:
         final_df = df
 
-    return final_df, selected_features, label_columns, milliseconds_per_instance
+    return final_df, selected_features
 
 
 def applied_model(
+    granularity: int,
     model_name: str,
     df: pd.DataFrame,
     selected_features: list[str],
-    label_columns: list[str],
     matching: str,
-    temporal_split: bool,
-    milliseconds_per_instance: float,
+    temporal_split: bool
 ) -> None:
     #### ANALYSIS SECTION ####
 
@@ -160,7 +153,7 @@ def applied_model(
             selected_features,
         )
 
-        n_cv_rep = 10  # number of cross-validation repetitions
+        n_cv_rep = 1  # number of cross-validation repetitions
 
         # performance_tr_rf, performance_te_rf = 0, 0
         performance_tr, performance_te = 0, 0
@@ -173,7 +166,7 @@ def applied_model(
             class_test_prob_y = None
             if model_name == "rf":
                 name = "RandomForest"
-                print(f"Training {name} run {repeat} / {n_cv_rep} ... ")
+                logger.info(f"Training {name} run {repeat} / {n_cv_rep} ... ")
                 (
                     class_train_y,
                     class_test_y,
@@ -182,7 +175,7 @@ def applied_model(
                 ) = class_pro.random_forest(gridsearch=True)
             else:
                 name = "SVM"
-                print(f"Training {name} run {repeat} / {n_cv_rep} ... ")
+                logger.info(f"Training {name} run {repeat} / {n_cv_rep} ... ")
                 (
                     class_train_y,
                     class_test_y,
@@ -197,19 +190,21 @@ def applied_model(
             )
             cm_te += cm
 
-        print(
+        logger.info(
             f"{name} train accurancy ({n_cv_rep} times average) : {performance_tr / n_cv_rep}"
         )
-        print(
+        logger.info(
             f"{name} test accurancy ({n_cv_rep} times average) : {performance_te / n_cv_rep}"
         )
 
         # Visualize the confusion matrix (evaluation)
+        filename = os.path.abspath(f"{os.path.dirname(__file__)}/../result/cm_{model_name}.png")
         class_eval.confusion_matrix_visualize(
             cm_te / n_cv_rep,
             [col.split(" ")[1] for col in class_train_prob_y.columns],
-            f"./cm_{model_name}.png",
+            filename,
         )
+        logger.info(f"The confusion matrix filename: {filename}")
 
     elif model_name in ["lstm", "conv_lstm", "time_conv_lstm", "gru"]:
         ### Temporal Predictive Modelling ###
@@ -221,7 +216,7 @@ def applied_model(
             df,
             label_columns,
             step=10,  # controls overlap (fraction of time_interval)
-            time_intervals=int(float(1000) / milliseconds_per_instance),
+            time_intervals=round(float(1000) / granularity),
         )
 
         ## Manual Fitting Example (fitting step-by-step)
@@ -233,38 +228,13 @@ def applied_model(
         _, _, result = class_nn.fit_predict(model=model_name, epochs=10, batch_size=128)
 
         # Visualiue the confusion matrix (evaluation)
+        filename = os.path.abspath(f"{os.path.dirname(__file__)}/../result/cm_{model_name}.png")
         class_eval.confusion_matrix_visualize(
             result,
             [col.split(" ")[1] for col in label_columns],
-            f"./cm_{model_name}.png",
+            filename,
         )
-
+        logger.info(f"The confusion matrix filename: {filename}")
     else:
-        print(f"{model_name} not found!")
-
-
-if __name__ == "__main__":
-    # Define classification and data split type (defaults of our analysis are selected)
-    matching = "like"  # "binary" for binary classification
-    temporal_split = True  # False for non-temporal train/test split
-    filter_outlier = False
-    for_temporal_model = True
-
-    (
-        df,
-        selected_features,
-        label_columns,
-        milliseconds_per_instance,
-    ) = generate_final_dataset(
-        matching, temporal_split, filter_outlier, for_temporal_model
-    )
-
-    applied_model(
-        "conv_lstm",
-        df,
-        selected_features,
-        label_columns,
-        matching,
-        temporal_split,
-        milliseconds_per_instance,
-    )
+        logger.error(f"{model_name} not found!")
+        exit(-1)

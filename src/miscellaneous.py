@@ -10,6 +10,15 @@ label_categories = [
     "Label Falling",
     "Error",
 ]
+label_columns = [
+    "Label Walking",
+    "Label Running",
+    "Label Kneeling",
+    "Label Lying",
+    "Label Sitting",
+    "Label Standing",
+    "Label Falling"
+]
 
 # round1-luca
 labels = [
@@ -213,3 +222,9 @@ selected_features_no_outlier = ['Accelerometer Y (m/s^2)_temp_min_ws_500',
                                 'Magnetometer Z (µT)_freq_7.4_Hz_ws_500', 
                                 'Magnetometer X (µT)_freq_41.6_Hz_ws_500', 
                                 'Accelerometer Z (m/s^2)_freq_36.0_Hz_ws_500']
+
+import logging
+logging.basicConfig(
+    format="%(levelname)s: %(message)s", encoding="utf-8", level=logging.INFO
+)
+logger = logging.getLogger()

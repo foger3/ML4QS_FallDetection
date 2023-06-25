@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
 
-from miscellaneous import label_map, label_categories
+from miscellaneous import label_map, label_categories, logger
 
 
 def load_dataset_map(
@@ -54,8 +54,8 @@ def concat_sensor_dataset(
 
 def label_validation(df: pd.DataFrame, labels: list) -> None:
     dataset_row_num = df[df["event"] == "START"].shape[0]
-    print("{} movements in this dataset.".format(dataset_row_num))
-    print(
+    logger.info("{} movements in this dataset.".format(dataset_row_num))
+    logger.info(
         "{} labels{}\n".format(
             len(labels),
             ", not match." if len(labels) != dataset_row_num else ", match.",
@@ -193,37 +193,36 @@ def assign_id_per_movement(
     return df
 
 
-filepath = "/Users/thl/Downloads/"
-round_num = 3
-names = ["luca", "nicole", "sam"]
-granularity = 10
-df_cleaned = pd.DataFrame()
-for round in range(1, round_num + 1):
-    for name in names:
-        # concatenate, fill missing value, and drop nan
-        filenames = glob(rf"{filepath}*-round{round}-{name}")
-        if len(filenames) == 1:
-            print(f"round{round}-{name}")
-            df_map = load_dataset_map(filenames[0])
-            df_result = concat_sensor_dataset(df_map)
-            # missing value
-            df_result = fill_missing_value(df_result)
-            # labeling
-            df_result = labeling(
-                df_result,
-                df_map["time"],
-                label_map[f"round{round}-{name}"],
-                label_categories,
-            )
-            df_result.drop(df_result[df_result["Error"] == 1].index, inplace=True)
-            df_result.drop(columns="Error", inplace=True)
-            # adjust time stamp
-            df_result = adjust_granularity_timestamp_timediff(
-                df_result, granularity, df_map["time"]
-            )
-            df_cleaned.reset_index(level=0, drop=True, inplace = True)
-            df_cleaned = pd.concat([df_cleaned, df_result], ignore_index=True)
-
-# assign id
-df_cleaned = assign_id_per_movement(df_cleaned)
-df_cleaned.to_csv(f"../dataset/data_cleaned_{granularity}.csv", index=False)
+def aggregate(granularity: int = 10):
+    filepath = "../dataset/raw/"
+    round_num = 3
+    names = ["luca", "nicole", "sam"]
+    df_cleaned = pd.DataFrame()
+    for round in range(1, round_num + 1):
+        for name in names:
+            # concatenate, fill missing value, and drop nan
+            filenames = glob(rf"{filepath}*-round{round}-{name}")
+            if len(filenames) == 1:
+                logger.info(f"round{round}-{name}")
+                df_map = load_dataset_map(filenames[0])
+                df_result = concat_sensor_dataset(df_map)
+                # missing value
+                df_result = fill_missing_value(df_result)
+                # labeling
+                df_result = labeling(
+                    df_result,
+                    df_map["time"],
+                    label_map[f"round{round}-{name}"],
+                    label_categories,
+                )
+                df_result.drop(df_result[df_result["Error"] == 1].index, inplace=True)
+                df_result.drop(columns="Error", inplace=True)
+                # adjust time stamp
+                df_result = adjust_granularity_timestamp_timediff(
+                    df_result, granularity, df_map["time"]
+                )
+                df_cleaned.reset_index(level=0, drop=True, inplace = True)
+                df_cleaned = pd.concat([df_cleaned, df_result], ignore_index=True)
+    # assign id
+    df_cleaned = assign_id_per_movement(df_cleaned)
+    df_cleaned.to_csv(f"../dataset/data_cleaned_{granularity}.csv", index=False)
